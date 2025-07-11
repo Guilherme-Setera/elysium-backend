@@ -20,13 +20,14 @@ app.include_router(rotas_infra.infra)
 app.include_router(rotas.api_router)
 
 
-def parse_origins(origins_raw: str) -> list[str]:
+def parse_origins(origins_raw: str | list[str]) -> list[str]:
+    if isinstance(origins_raw, list):
+        return origins_raw
     try:
-        # Se for um JSON válido como '["url1", "url2"]'
         return json.loads(origins_raw) if origins_raw.startswith("[") else [origins_raw]
     except Exception:
-        return []
-
+        return ["*"]
+    
 if settings.ENVIRONMENT == "local":
     app.add_middleware(
         CORSMiddleware,
