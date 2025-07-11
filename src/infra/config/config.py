@@ -3,7 +3,7 @@ from pydantic import computed_field
 
 
 class ApiSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="allow")
+    model_config = SettingsConfigDict(env_nested_delimiter="__", extra="allow")
 
     PROJECT_NAME: str = "Ambrosia API"
     PROJECT_VERSION: str = "0.1.0"
