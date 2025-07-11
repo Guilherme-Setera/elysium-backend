@@ -1,4 +1,5 @@
 import warnings
+import json
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,14 @@ app = FastAPI(
 app.include_router(rotas_infra.infra)
 app.include_router(rotas.api_router)
 
+
+def parse_origins(origins_raw: str) -> list[str]:
+    try:
+        # Se for um JSON válido como '["url1", "url2"]'
+        return json.loads(origins_raw) if origins_raw.startswith("[") else [origins_raw]
+    except Exception:
+        return []
+
 if settings.ENVIRONMENT == "local":
     app.add_middleware(
         CORSMiddleware,
@@ -29,7 +38,7 @@ if settings.ENVIRONMENT == "local":
 else:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.ORIGINS or [],
+        allow_origins=parse_origins(settings.ORIGINS),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -37,5 +46,6 @@ else:
 
 configure_openapi(app)
 
-if __name__ == "__main__":
+# Apenas para uso local
+if __name__ == "__main__" and settings.ENVIRONMENT == "local":
     uvicorn.run(app=app, host="0.0.0.0", port=8000)

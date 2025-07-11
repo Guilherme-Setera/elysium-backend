@@ -28,7 +28,7 @@ class ApiSettings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     JWT_SECRET_KEY: str
-    ORIGINS: list[str] = []
+    ORIGINS: str = "*"
 
     @computed_field
     @property
