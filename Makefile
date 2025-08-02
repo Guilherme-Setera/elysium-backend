@@ -11,7 +11,7 @@
 
 # Executa a API principal (assumindo main.py na raiz do backend/)
 run:
-	uvicorn main:app --reload --host 0.0.0.0 --port 8000
+	PYTHONPATH=./src python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # Executa a API no modo docker (porta 8100)
 backend-run:

@@ -1,108 +1,55 @@
-from typing import Optional
 from datetime import date
-from src.modules.vendas.dto.dto import VendaCreate, VendaResponse, VendaUpdate, PainelResumoResponse, ResumoVendasPorData, RelatorioDetalhadoProduto, LogVendaResponse
-from src.modules.vendas.abc_classes.vendas_abc import IVendasRepository
+from src.modules.vendas.dto.dto import VendaCreate, ItemVendaCreate, VendaResponse, ItemVendaResponse
+from src.modules.vendas.repository.vendas_repository import VendaRepository
+from src.modules.estoque.repository.estoque_repository import EstoqueRepository
+from datetime import datetime
 
 
 class RegistrarVendaUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
+    def __init__(self, venda_repo: VendaRepository, estoque_repo: EstoqueRepository):
+        self.venda_repo = venda_repo
+        self.estoque_repo = estoque_repo
 
-    async def execute(self, payload: VendaCreate) -> int:
-        return await self.repo.registrar_venda(payload)
+    def executar(self, venda: VendaCreate) -> int:
+        data_ref: date = (venda.data_venda or datetime.now()).date()
+
+        # 1. Buscar saldo de estoque na data da venda
+        estoque_atual = self.estoque_repo.listar_estoque_atual(data_referencia=data_ref)
+        saldos = {e.produto_id: e.saldo_estoque for e in estoque_atual}
+
+        # 2. Verificar estoque suficiente para todos os itens
+        for item in venda.itens:
+            saldo = saldos.get(item.produto_id, 0)
+            if item.quantidade > saldo:
+                raise ValueError(f"Estoque insuficiente para o produto ID {item.produto_id}.")
+
+        # 3. Calcular total da venda
+        total = sum(item.quantidade * item.preco_unitario for item in venda.itens)
+
+        # 4. Inserir venda
+        venda_id = self.venda_repo.inserir_venda(venda, total)
+
+        # 5. Inserir itens e movimentações
+        for item in venda.itens:
+            self.venda_repo.inserir_item_venda(venda_id, item)
+            self.venda_repo.registrar_saida_por_venda(
+                produto_id=item.produto_id,
+                quantidade=item.quantidade,
+                data_mov=venda.data_venda or datetime.now()
+            )
+
+        return venda_id
 
 class ListarVendasUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
-
-    async def execute(
-        self,
-        cliente_id: Optional[int] = None,
-        data_inicio: Optional[date] = None,
-        data_fim: Optional[date] = None,
-        forma_pagamento: Optional[str] = None,
-    ) -> list[VendaResponse]:
-        return await self.repo.listar_vendas(
-            cliente_id=cliente_id,
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            forma_pagamento=forma_pagamento
-        )
-    
-class BuscarVendaPorIdUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
-
-    async def execute(self, venda_id: int) -> VendaResponse | None:
-        return await self.repo.buscar_venda_por_id(venda_id)  
-
-class AtualizarVendaUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
-
-    async def execute(self, venda_id: int, payload: VendaUpdate) -> None:
-        await self.repo.atualizar_venda(venda_id, payload)
-
-class ExcluirVendaUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
-
-    async def execute(self, venda_id: int) -> None:
-        await self.repo.excluir_venda(venda_id)        
-
-class GerarPainelResumoUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
-
-    async def execute(self, inicio: date, fim: date) -> PainelResumoResponse:
-        return await self.repo.painel_resumo(inicio, fim)        
-    
-class GerarRelatorioResumoUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
-
-    async def execute(self, data_inicio: date, data_fim: date) -> list[ResumoVendasPorData]:
-        return await self.repo.gerar_relatorio_resumo(data_inicio, data_fim)    
-    
-class GerarRelatorioDetalhadoProdutosUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
-
-    async def execute(self, data_inicio: date, data_fim: date) -> list[RelatorioDetalhadoProduto]:
-        return await self.repo.gerar_relatorio_detalhado_produtos(data_inicio, data_fim)    
-    
-class RegistrarLogAlteracaoUseCase:
-    def __init__(self, repo: IVendasRepository) -> None:
-        self.repo: IVendasRepository = repo
-
-    async def execute(
-        self,
-        venda_id: int,
-        campo: str,
-        valor_anterior: str,
-        valor_novo: str,
-        usuario: str
-    ) -> None:
-        await self.repo.registrar_log_alteracao(
-            venda_id=venda_id,
-            campo=campo,
-            valor_anterior=valor_anterior,
-            valor_novo=valor_novo,
-            usuario=usuario
-        )    
-
-class ListarLogsVendaUseCase:
-    def __init__(self, repo: IVendasRepository):
+    def __init__(self, repo: VendaRepository):
         self.repo = repo
 
-    async def execute(
-        self,
-        venda_id: Optional[int] = None,
-        data_inicio: Optional[date] = None,
-        data_fim: Optional[date] = None
-    ) -> list[LogVendaResponse]:
-        return await self.repo.listar_logs_venda(
-            venda_id=venda_id,
-            data_inicio=data_inicio,
-            data_fim=data_fim
-        )        
+    def executar(self) -> list[VendaResponse]:
+        return self.repo.buscar_vendas()
+    
+class ListarItensVendaUseCase:
+    def __init__(self, repo: VendaRepository):
+        self.repo = repo
+
+    def executar(self, venda_id: int) -> list[ItemVendaResponse]:
+        return self.repo.buscar_itens_por_venda_id(venda_id)    

@@ -1,73 +1,40 @@
 from pydantic import BaseModel
-from datetime import datetime, date
-from decimal import Decimal
+from typing import Optional, List
+from datetime import datetime
+
 
 class ItemVendaCreate(BaseModel):
     produto_id: int
     quantidade: int
-    preco_unitario: Decimal
+    preco_unitario: float
 
-class VendaCreate(BaseModel):
-    cliente_id: int | None= None
-    forma_pagamento: str
-    itens: list[ItemVendaCreate]
 
 class ItemVendaResponse(BaseModel):
     id: int
+    venda_id: int
     produto_id: int
     nome_produto: str
     quantidade: int
-    preco_unitario: Decimal
-    subtotal: Decimal
+    preco_unitario: float
+    subtotal: float
+
+
+class VendaCreate(BaseModel):
+    cliente_id: Optional[int]
+    forma_pagamento_id: int
+    data_venda: Optional[datetime] = None
+    data_pagamento: Optional[datetime] = None
+    observacao: Optional[str] = None
+    itens: List[ItemVendaCreate]
+
 
 class VendaResponse(BaseModel):
     id: int
-    cliente_id: int | None= None
-    cliente_nome: str | None = None
-    data_venda: datetime
-    total: Decimal
+    cliente_id: Optional[int]
+    nome_cliente: Optional[str]
+    forma_pagamento_id: int
     forma_pagamento: str
-    itens: list[ItemVendaResponse]
-
-class ResumoVendasPorData(BaseModel):
-    data: date
-    total_vendas: int
-    valor_total: Decimal
-
-class PainelResumoResponse(BaseModel):
-    total_diario: Decimal
-    total_mensal: Decimal
-    quantidade_vendas: int
-
-class VendaUpdate(BaseModel):
-    forma_pagamento: str | None= None
-    cliente_id: int | None= None
-
-class LogVendaResponse(BaseModel):
-    id: int
-    venda_id: int
-    campo_alterado: str
-    valor_anterior: str
-    valor_novo: str
-    data_alteracao: datetime
-
-class VendaDetalhadaResponse(BaseModel):
-    id: int
-    cliente_id: int | None = None
     data_venda: datetime
-    total: Decimal
-    forma_pagamento: str
-    itens: list[ItemVendaResponse]    
-
-class RelatorioDetalhadoProduto(BaseModel):
-    produto_id: int
-    nome_produto: str
-    total_vendido: int
-    total_faturado: Decimal    
-
-class VendaListagemResponse(BaseModel):
-    id: int
-    data_venda: datetime
-    total: Decimal
-    forma_pagamento: str
-    cliente_nome: str | None = None
+    data_pagamento: Optional[datetime]
+    total: float
+    observacao: Optional[str]
