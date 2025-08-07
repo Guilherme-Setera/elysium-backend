@@ -3,7 +3,7 @@ from datetime import date
 from typing import Optional, List, cast
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from sqlalchemy.engine import CursorResult
+from sqlalchemy.engine import CursorResult, Result
 
 from src.modules.produtos.controller.dto import ProdutoCreate, ProdutoUpdate, ProdutoResponse, ProdutoPrecoResponse
 
@@ -59,6 +59,7 @@ class ProdutosRepository:
                 validade=row.validade,
                 ativo=row.ativo,
                 preco_custo=row.preco_custo,
+                estoque_minimo=row.estoque_minimo,
                 preco_venda=row.preco_venda,
                 data_preco=row.data_preco,
             )
@@ -108,20 +109,16 @@ class ProdutosRepository:
         self.session.commit()
         return result.rowcount
 
-    def atualizar_produto(self, produto_id: int, data: ProdutoUpdate) -> int:
+    def atualizar_produto(self, produto_id: int, data: ProdutoUpdate) -> bool:
+        dados = vars(data)
+        dados["produto_id"] = produto_id
+
         query_path = os.path.join(QUERIES_FOLDER, "update_produto.sql")
-        query: str = open(query_path).read()
-        result = cast(CursorResult, self.session.execute(
-            text(query),
-            {
-                "id": produto_id,
-                "nome": data.nome,
-                "descricao": data.descricao,
-                "validade": data.validade
-            }
-        ))
+        query = open(query_path).read()
+
+        result = cast(CursorResult, self.session.execute(text(query), dados))
         self.session.commit()
-        return result.rowcount
+        return result.rowcount > 0
 
     def buscar_produto_por_id(self, produto_id: int, data_referencia: Optional[date] = None) -> Optional[ProdutoResponse]:
         query_path = os.path.join(QUERIES_FOLDER, "select_produto_por_id.sql")
@@ -141,6 +138,7 @@ class ProdutosRepository:
             descricao=row.descricao,
             validade=row.validade,
             ativo=row.ativo,
+            estoque_minimo=row.estoque_minimo,
             preco_custo=row.preco_custo,
             preco_venda=row.preco_venda,
             data_preco=row.data_preco,

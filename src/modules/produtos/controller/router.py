@@ -12,6 +12,7 @@ from src.modules.produtos.controller.dto import (
     ProdutoUpdate,
     ProdutoResponse,
     ProdutoPrecoResponse,
+    ProdutoUpdateComId
 )
 
 router = APIRouter(prefix="/produtos", tags=["Produtos"])
@@ -52,6 +53,15 @@ def atualizar_produto(
     if not atualizado:
         raise HTTPException(status_code=404, detail="Produto não encontrado ou não atualizado")
     return True
+
+@router.put("/batch", response_model=int)
+def atualizar_produtos_em_lote(
+    updates: list[ProdutoUpdateComId],
+    usecase: ProdutosUseCase = Depends(get_usecase)
+):
+    atualizados = usecase.atualizar_produtos_em_lote(updates)
+    return atualizados
+
 
 @router.delete("/{produto_id}", response_model=bool)
 def desativar_produto(

@@ -14,7 +14,7 @@ SELECT
 FROM ambrosia.produtos p
 INNER JOIN ambrosia.movimentacoes_estoque m
     ON m.produto_id = p.id
-    AND m.data_mov <= :data_referencia
+    AND DATE(m.data_mov) <= :data_referencia
 LEFT JOIN LATERAL (
     SELECT pp.preco_custo, pp.preco_venda
     FROM ambrosia.produtos_precos pp

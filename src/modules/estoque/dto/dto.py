@@ -2,6 +2,13 @@ from pydantic import BaseModel
 from datetime import date
 from typing import Optional
 
+class CategoriaCustoCreate(BaseModel):
+    nome: str
+
+class CategoriaCustoResponse(BaseModel):
+    id: int
+    nome: str
+
 
 class MovimentacaoCreate(BaseModel):
     produto_id: int
@@ -27,17 +34,19 @@ class EstoqueBaixoResponse(BaseModel):
     saldo_estoque: int
     estoque_minimo: int | None = None
 
+
 class OperacaoResponse(BaseModel):
     id: int
     descricao: str
-    tipo: str 
+    tipo: str
 
 class ProdutoCreate(BaseModel):
     nome: str
     descricao: str | None = None
-    validade:  date | None= None
+    validade: date | None = None
     ativo: Optional[bool] = True
     estoque_minimo: Optional[int] = None
+
 
 class ProdutoResponse(BaseModel):
     id: int
@@ -45,7 +54,8 @@ class ProdutoResponse(BaseModel):
     descricao: Optional[str] = None
     validade: Optional[date] = None
     ativo: bool
-    estoque_minimo: int  | None = None  
+    estoque_minimo: int | None = None
+
 
 class ProdutoPrecoResponse(BaseModel):
     id: int
@@ -53,31 +63,35 @@ class ProdutoPrecoResponse(BaseModel):
     data_referencia: date
     preco_custo: float
     preco_venda: float
-    data_fim: Optional[date] = None    
+    data_fim: Optional[date] = None
+
 
 class PrecoAtualResponse(BaseModel):
     nome: str
     preco_custo: float
-    preco_venda: float    
+    preco_venda: float
     estoque: int
 
 class PrecoManualInput(BaseModel):
     preco_custo: float
     preco_venda: float
-    data_referencia: Optional[date] = None    
+    data_referencia: Optional[date] = None
 
 class CustoOperacionalCreate(BaseModel):
-    categoria: str
+    categoria_id: int
     valor: float
     data_referencia: date
     observacao: Optional[str] = None
 
+
 class CustoOperacionalResponse(BaseModel):
     id: int
-    categoria: str
+    categoria_id: int
+    nome_categoria: Optional[str] = None
     valor: float
     data_referencia: date
-    observacao: Optional[str] = None    
+    observacao: Optional[str] = None
+
 
 class CustoEstoqueResponse(BaseModel):
     produto_id: int
@@ -85,4 +99,4 @@ class CustoEstoqueResponse(BaseModel):
     data_movimentacao: date
     quantidade: float
     preco_custo: float
-    custo_total: float    
+    custo_total: float

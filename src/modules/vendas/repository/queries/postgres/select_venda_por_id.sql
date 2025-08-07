@@ -1,5 +1,5 @@
 SELECT
-  v.id,
+  v.id AS id, 
   v.cliente_id,
   c.nome AS nome_cliente,
   v.forma_pagamento_id,
@@ -11,6 +11,6 @@ SELECT
   v.pago,
   v.cancelada
 FROM ambrosia.vendas v
-LEFT JOIN ambrosia.clientes c ON v.cliente_id = c.id
-LEFT JOIN ambrosia.formas_pagamento f ON v.forma_pagamento_id = f.id
-ORDER BY v.data_venda DESC;
+JOIN ambrosia.clientes c ON c.id = v.cliente_id
+JOIN ambrosia.formas_pagamento f ON f.id = v.forma_pagamento_id
+WHERE v.id = :venda_id;

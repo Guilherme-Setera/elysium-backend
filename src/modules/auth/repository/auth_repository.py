@@ -18,12 +18,14 @@ class AuthRepository:
 
         for row in rows:
             login = row[0]          # email / str_Login
-            pwd_hash = row[1]       # senha_hash / str_PwdHash
+            pwd_hash = row[1]
+            nome = row[2]        # senha_hash / str_PwdHash
             role = row[2]           # role / str_Role
 
             users_dict[login] = {
-                "pwd_hash": pwd_hash
-            }
+                "pwd_hash": pwd_hash,
+                "nome": nome
+            }   
 
             if role not in roles_dict:
                 roles_dict[role] = []

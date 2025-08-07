@@ -12,7 +12,9 @@ from src.modules.estoque.dto.dto import (
     PrecoAtualResponse,
     CustoOperacionalCreate,
     CustoOperacionalResponse,
-    CustoEstoqueResponse
+    CustoEstoqueResponse,
+    CategoriaCustoResponse,
+    CategoriaCustoCreate
 )
 from src.modules.estoque.abc_classes.estoque_abc import IEstoqueRepository
 
@@ -45,8 +47,6 @@ class EstoqueUseCase:
     def desativar_produto(self, id: int) -> bool:
         return self.repo.desativar_produto(id)
 
-    # ✅ NOVOS MÉTODOS DE PREÇO
-
     def inserir_preco_produto(self, produto_id: int, preco_custo: float, preco_venda: float, data_referencia: date) -> int:
         return self.repo.inserir_preco_produto(produto_id, preco_custo, preco_venda, data_referencia)
 
@@ -64,3 +64,11 @@ class EstoqueUseCase:
 
     def listar_custos_estoque_por_data(self, data_inicio: date, data_fim: date) -> List[CustoEstoqueResponse]:
         return self.repo.listar_custos_estoque_por_data(data_inicio, data_fim)
+
+    # 🆕 Métodos para categorias de custo
+    def inserir_categoria_custo(self, data: CategoriaCustoCreate) -> int:
+        return self.repo.inserir_categoria_custo(data.nome)
+
+
+    def listar_categorias_custo(self) -> List[CategoriaCustoResponse]:
+        return self.repo.listar_categorias_custo()

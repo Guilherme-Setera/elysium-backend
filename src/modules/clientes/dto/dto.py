@@ -1,3 +1,4 @@
+from datetime import date
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 
@@ -5,17 +6,14 @@ from typing import Optional
 class ClienteBase(BaseModel):
     nome: str
     celular: str
-    endereco: str
-    email: str | None = None
-    cpf: str | None = None
+    endereco: Optional[str] = None
+    email: Optional[str] = None
+    cpf: Optional[str] = None
+    descricao: Optional[str] = None
 
 
 class ClienteCreate(ClienteBase):
-    nome: str
-    celular: str
-    endereco: str
-    email: str | None = None
-    cpf: str | None = None
+    pass
 
 
 class ClienteUpdate(ClienteBase):
@@ -24,3 +22,5 @@ class ClienteUpdate(ClienteBase):
 
 class ClienteResponse(ClienteBase):
     id: int
+    descricao: Optional[str] = None
+    dt_start: Optional[date] = None

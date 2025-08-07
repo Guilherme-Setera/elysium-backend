@@ -28,6 +28,16 @@ class VendaCreate(BaseModel):
     itens: List[ItemVendaCreate]
 
 
+class VendaUpdate(BaseModel):
+    id: int  # identificação da venda a ser atualizada
+    cliente_id: Optional[int]
+    forma_pagamento_id: int
+    data_venda: Optional[datetime] = None
+    data_pagamento: Optional[datetime] = None
+    observacao: Optional[str] = None
+    itens: List[ItemVendaCreate]
+
+
 class VendaResponse(BaseModel):
     id: int
     cliente_id: Optional[int]
@@ -38,3 +48,9 @@ class VendaResponse(BaseModel):
     data_pagamento: Optional[datetime]
     total: float
     observacao: Optional[str]
+    pago: bool
+    cancelada: bool
+
+
+class ConfirmacaoPagamento(BaseModel):
+    venda_id: int

@@ -28,6 +28,8 @@ def parse_origins(origins_raw: str | list[str]) -> list[str]:
         return json.loads(origins_raw) if origins_raw.startswith("[") else [origins_raw]
     except Exception:
         return ["*"]
+    
+print("ENVIRONMENT =", settings.ENVIRONMENT)    
 
 if settings.ENVIRONMENT == "local":
     app.add_middleware(
@@ -45,6 +47,9 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+    
 
 configure_openapi(app)
 

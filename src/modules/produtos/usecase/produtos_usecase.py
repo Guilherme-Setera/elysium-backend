@@ -7,6 +7,7 @@ from src.modules.produtos.controller.dto import (
     ProdutoUpdate,
     ProdutoResponse,
     ProdutoPrecoResponse,
+    ProdutoUpdateComId
 )
 
 class ProdutosUseCase:
@@ -33,6 +34,13 @@ class ProdutosUseCase:
     def atualizar_produto(self, produto_id: int, data: ProdutoUpdate) -> bool:
         linhas_afetadas = self.repository.atualizar_produto(produto_id, data)
         return linhas_afetadas > 0
+    
+    def atualizar_produtos_em_lote(self, updates: list[ProdutoUpdateComId]) -> int:
+        count = 0
+        for item in updates:
+            rowcount = self.repository.atualizar_produto(item.id, item)
+            count += rowcount
+        return count
 
     def buscar_produto_por_id(self, produto_id: int, data_referencia: Optional[date] = None) -> Optional[ProdutoResponse]:
         return self.repository.buscar_produto_por_id(produto_id, data_referencia)

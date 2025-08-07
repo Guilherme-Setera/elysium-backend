@@ -28,7 +28,8 @@ class ClientesUseCase:
             celular=data.celular,
             endereco=data.endereco,
             email=data.email,
-            cpf=data.cpf
+            cpf=data.cpf,
+            descricao=data.descricao,
         )
         return linhas_afetadas > 0
 

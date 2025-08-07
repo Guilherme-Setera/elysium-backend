@@ -17,9 +17,10 @@ class IClienteRepository(ABC):
         cliente_id: int,
         nome: str,
         celular: str,
-        endereco: str,
+        endereco: str | None = None,
         email: str | None = None,
-        cpf: str | None = None
+        cpf: str | None = None,
+        descricao: str | None = None
     ) -> int:
         ...
 

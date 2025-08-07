@@ -1,11 +1,11 @@
 INSERT INTO ambrosia.custos_operacionais (
-    categoria,
+    categoria_id,
     valor,
     data_referencia,
     observacao
 )
 VALUES (
-    :categoria,
+    :categoria_id,
     :valor,
     :data_referencia,
     :observacao

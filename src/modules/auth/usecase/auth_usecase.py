@@ -1,11 +1,10 @@
 from fastapi import HTTPException, status
-from pydantic import BaseModel
 from contextlib import suppress
-from src.modules.auth.models.schemas import TokenRequest
+
+from src.modules.auth.models.schemas import TokenRequest, Token, UserOut
 from src.modules.auth.repository.auth_repository import AuthRepository
 from src.modules.auth.security import password_utils, token_utils
 from src.infra.db.connection import get_postgres_cursor
-from src.modules.auth.models.schemas import Token
 
 
 def validate_and_create_access_token(req: TokenRequest) -> Token:
@@ -25,13 +24,15 @@ def validate_and_create_access_token(req: TokenRequest) -> Token:
 
         access_token = token_utils.create_access_token({"sub": req.username})
 
+        print('[DEBUG] Dados do usuário retornado:', user_data["nome"])
+        print('[DEBUG] Token retornado:', access_token)
+
         return Token(
             access_token=access_token,
             token_type="bearer",
-            username=req.username
+            user=UserOut(full_name=user_data["nome"])
         )
 
     finally:
         with suppress(StopIteration):
             next(gen)
-            

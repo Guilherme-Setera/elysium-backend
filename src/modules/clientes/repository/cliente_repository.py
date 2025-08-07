@@ -23,7 +23,8 @@ class ClienteRepository(IClienteRepository):
             "celular": cliente.celular,
             "endereco": cliente.endereco,
             "email": cliente.email,
-            "cpf": cliente.cpf
+            "cpf": cliente.cpf,
+            "descricao": cliente.descricao,
         }).fetchone()
 
         self.session.commit()
@@ -36,16 +37,17 @@ class ClienteRepository(IClienteRepository):
         params = {}
         for idx, c in enumerate(clientes):
             values.append(
-                f"(:nome{idx}, :celular{idx}, :endereco{idx}, :email{idx}, :cpf{idx})"
+                f"(:nome{idx}, :celular{idx}, :endereco{idx}, :email{idx}, :cpf{idx}, :descricao{idx})"
             )
             params[f'nome{idx}'] = c.nome
             params[f'celular{idx}'] = c.celular
             params[f'endereco{idx}'] = c.endereco
             params[f'email{idx}'] = c.email
             params[f'cpf{idx}'] = c.cpf
+            params[f'descricao{idx}'] = c.descricao
 
         query = f"""
-        INSERT INTO ambrosia.clientes (nome, celular, endereco, email, cpf)
+        INSERT INTO ambrosia.clientes (nome, celular, endereco, email, cpf, descricao)
         VALUES {', '.join(values)}
         RETURNING id;
         """
@@ -54,7 +56,16 @@ class ClienteRepository(IClienteRepository):
         self.session.commit()
         return ids
 
-    def atualizar_cliente(self, cliente_id: int, nome: str, celular: str, endereco: str, email: Optional[str], cpf: Optional[str]) -> int:
+    def atualizar_cliente(
+        self,
+        cliente_id: int,
+        nome: str,
+        celular: str,
+        endereco: Optional[str],
+        email: Optional[str],
+        cpf: Optional[str],
+        descricao: Optional[str]
+    ) -> int:
         query_path = os.path.join(QUERIES_FOLDER, "update_cliente.sql")
         query: str = open(query_path).read()
 
@@ -64,7 +75,8 @@ class ClienteRepository(IClienteRepository):
             "celular": celular,
             "endereco": endereco,
             "email": email,
-            "cpf": cpf
+            "cpf": cpf,
+            "descricao": descricao,
         }))
 
         self.session.commit()
@@ -92,7 +104,9 @@ class ClienteRepository(IClienteRepository):
                 celular=row[2],
                 endereco=row[3],
                 email=row[4],
-                cpf=row[5]
+                cpf=row[5],
+                descricao=row[6],
+                dt_start=row[7]
             )
             for row in rows
         ]

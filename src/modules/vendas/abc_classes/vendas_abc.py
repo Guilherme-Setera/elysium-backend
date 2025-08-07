@@ -1,9 +1,13 @@
-# modules/vendas/repository/interfaces.py
-
 from abc import ABC, abstractmethod
 from datetime import datetime
-from src.modules.vendas.dto.dto import VendaCreate, ItemVendaCreate
-from typing import Sequence
+from typing import Sequence, Optional
+
+from src.modules.vendas.dto.dto import (
+    VendaCreate,
+    ItemVendaCreate,
+    ItemVendaResponse, 
+    VendaResponse
+)
 
 
 class IVendaRepository(ABC):
@@ -25,5 +29,30 @@ class IVendaRepository(ABC):
         ...
 
     @abstractmethod
-    def registrar_saida_por_venda(self, produto_id: int, quantidade: int, data_mov: datetime) -> int:
+    def registrar_entrada_por_devolucao(self, produto_id: int, quantidade: int, data_mov: datetime) -> int:
         ...
+
+    @abstractmethod
+    def atualizar_venda(self, venda_id: int, venda: VendaCreate, total: float) -> None:
+        ...
+
+    @abstractmethod
+    def confirmar_pagamento(self, venda_id: int) -> None:
+        ...
+
+    @abstractmethod
+    def cancelar_venda(self, venda_id: int, itens: list[ItemVendaResponse]) -> None:
+        ...
+
+    @abstractmethod
+    def buscar_venda_por_id(self, venda_id: int) -> Optional[VendaResponse]:
+        ...
+
+    @abstractmethod
+    def deletar_itens_da_venda(self, venda_id: int) -> None:
+        ...
+
+
+    @abstractmethod
+    def listar_vendas_nao_pagas(self) -> list[VendaResponse]:
+       ...      

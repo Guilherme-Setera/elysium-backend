@@ -14,7 +14,9 @@ from src.modules.estoque.dto.dto import (
     PrecoManualInput,
     CustoOperacionalCreate,
     CustoOperacionalResponse,
-    CustoEstoqueResponse
+    CustoEstoqueResponse,
+    CategoriaCustoCreate,
+    CategoriaCustoResponse
 
 )
 from src.modules.estoque.usecase.estoque_usecase import EstoqueUseCase
@@ -132,3 +134,16 @@ def listar_custos_estoque(
     usecase: EstoqueUseCase = Depends(get_estoque_usecase)
 ) -> list[CustoEstoqueResponse]:
     return usecase.listar_custos_estoque_por_data(data_inicio, data_fim)
+
+@router.post("/categorias-custo", response_model=int)
+def criar_categoria_custo(
+    data: CategoriaCustoCreate,
+    usecase: EstoqueUseCase = Depends(get_estoque_usecase)
+):
+    return usecase.inserir_categoria_custo(data)
+
+@router.get("/categorias-custo", response_model=list[CategoriaCustoResponse])
+def listar_categorias_custo(
+    usecase: EstoqueUseCase = Depends(get_estoque_usecase)
+) -> list[CategoriaCustoResponse]:
+    return usecase.listar_categorias_custo()

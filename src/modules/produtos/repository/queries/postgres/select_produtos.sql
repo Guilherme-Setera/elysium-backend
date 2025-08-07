@@ -4,6 +4,7 @@ SELECT
     p.descricao,
     p.validade,
     p.ativo,
+    p.estoque_minimo,
     pp.preco_custo,
     pp.preco_venda,
     pp.data_referencia AS data_preco

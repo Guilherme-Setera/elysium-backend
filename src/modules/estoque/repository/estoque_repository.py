@@ -16,7 +16,8 @@ from src.modules.estoque.dto.dto import (
     PrecoAtualResponse,
     CustoOperacionalCreate,
     CustoOperacionalResponse,
-    CustoEstoqueResponse
+    CustoEstoqueResponse,
+    CategoriaCustoResponse
 
 )
 from src.modules.estoque.abc_classes.estoque_abc import IEstoqueRepository
@@ -184,7 +185,7 @@ class EstoqueRepository(IEstoqueRepository):
                 saldo_estoque=row[2],
                 preco_custo=row[3],
                 preco_venda=row[4],
-                data_movimentacao=row[5],
+                data_movimentacao=row[5].date(),
             )
             for row in rows
         ]
@@ -240,35 +241,55 @@ class EstoqueRepository(IEstoqueRepository):
 
     def inserir_custo_operacional(self, data: CustoOperacionalCreate) -> int:
         query_path = os.path.join(QUERIES_FOLDER, "insert_custo_operacional.sql")
-        query = open(query_path).read()
-
-        result = self.session.execute(text(query), {
-            "categoria": data.categoria,
-            "valor": data.valor,
-            "data_referencia": data.data_referencia,
-            "observacao": data.observacao
-        }).fetchone()
+        with open(query_path) as f:
+            query = f.read()
+        print("[LOG] Data recebida para salvar:", data.data_referencia, type(data.data_referencia))
+        result = self.session.execute(
+            text(query),
+            {
+                "categoria_id": data.categoria_id,  # agora usamos o ID da categoria
+                "valor": data.valor,
+                "data_referencia": data.data_referencia,
+                "observacao": data.observacao,
+            }
+        ).fetchone()
 
         self.session.commit()
         return result[0] if result else -1
     
     def listar_custos_operacionais(self, data_inicio: date, data_fim: date) -> list[CustoOperacionalResponse]:
         query_path = os.path.join(QUERIES_FOLDER, "select_custos_operacionais_por_data.sql")
-        query = open(query_path).read()
+        with open(query_path) as f:
+            query = f.read()
 
-        rows = self.session.execute(text(query), {
-            "data_inicio": data_inicio,
-            "data_fim": data_fim
-        }).fetchall()
+        # ✅ Log de depuração das datas
+        print("[DEBUG] Datas recebidas no listar_custos_operacionais:")
+        print(f"  → data_inicio: {data_inicio} ({type(data_inicio)})")
+        print(f"  → data_fim: {data_fim} ({type(data_fim)})")
+
+        rows = self.session.execute(
+            text(query),
+            {
+                "data_inicio": data_inicio,
+                "data_fim": data_fim
+            }
+        ).fetchall()
+
+        # ✅ Log de retorno das linhas
+        print("[DEBUG] Linhas retornadas:")
+        for row in rows:
+            print(f"  → data_referencia: {row[4]} ({type(row[4])})")
 
         return [
             CustoOperacionalResponse(
                 id=row[0],
-                categoria=row[1],
-                valor=row[2],
-                data_referencia=row[3],
-                observacao=row[4]
-            ) for row in rows
+                categoria_id=row[1],
+                nome_categoria=row[2],
+                valor=row[3],
+                data_referencia=row[4],
+                observacao=row[5]
+            )
+            for row in rows
         ]
     
     def listar_custos_estoque_por_data(self, data_inicio: date, data_fim: date) -> list[CustoEstoqueResponse]:
@@ -284,10 +305,27 @@ class EstoqueRepository(IEstoqueRepository):
             CustoEstoqueResponse(
                 produto_id=row[0],
                 nome_produto=row[1],
-                data_movimentacao=row[2],
+                data_movimentacao=row[2].date(),
                 quantidade=row[3],
                 preco_custo=row[4],
                 custo_total=row[5]
             )
             for row in rows
         ]
+    
+    def inserir_categoria_custo(self, nome: str) -> int:
+        query_path = os.path.join(QUERIES_FOLDER, "insert_categoria_custo.sql")
+        query = open(query_path).read()
+
+        result = self.session.execute(text(query), {"nome": nome}).fetchone()
+        self.session.commit()
+
+        return result[0] if result else -1
+
+    def listar_categorias_custo(self) -> list[CategoriaCustoResponse]:
+        query_path = os.path.join(QUERIES_FOLDER, "select_categorias_custo.sql")
+        query = open(query_path).read()
+
+        rows = self.session.execute(text(query)).fetchall()
+
+        return [CategoriaCustoResponse(id=row[0], nome=row[1]) for row in rows]
