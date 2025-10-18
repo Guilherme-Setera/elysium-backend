@@ -1,14 +1,14 @@
-INSERT INTO ambrosia.produtos (
+INSERT INTO elysium.produtos (
     nome,
     descricao,
-    validade,
+    meses_para_vencer,
     ativo,
     estoque_minimo
 )
 VALUES (
     :nome,
     :descricao,
-    :validade,
+    :meses_para_vencer,
     :ativo,
     :estoque_minimo
 )

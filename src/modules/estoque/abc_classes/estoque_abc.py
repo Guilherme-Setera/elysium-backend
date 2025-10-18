@@ -14,13 +14,18 @@ from src.modules.estoque.dto.dto import (
     CustoOperacionalCreate,
     CustoOperacionalResponse,
     CustoEstoqueResponse,
-    CategoriaCustoResponse,  # ✅ novo DTO
+    CategoriaCustoResponse,
+    MovimentacaoUpdate
 )
 
 
 class IEstoqueRepository(ABC):
     @abstractmethod
     def registrar_movimentacao(self, data: MovimentacaoCreate) -> int:
+        ...
+
+    @abstractmethod
+    def atualizar_movimentacao(self, mov_id: int, data: MovimentacaoUpdate) -> int:
         ...
 
     @abstractmethod
@@ -51,7 +56,6 @@ class IEstoqueRepository(ABC):
     def desativar_produto(self, id: int) -> bool:
         ...
 
-    # ✅ PREÇOS
     @abstractmethod
     def inserir_preco_produto(self, produto_id: int, preco_custo: float, preco_venda: float, data: date) -> int:
         ...
@@ -68,7 +72,6 @@ class IEstoqueRepository(ABC):
     def listar_precos_produto(self, produto_id: int) -> List[ProdutoPrecoResponse]:
         ...
 
-    # ✅ CUSTOS
     @abstractmethod
     def inserir_custo_operacional(self, data: CustoOperacionalCreate) -> int:
         ...
@@ -81,7 +84,6 @@ class IEstoqueRepository(ABC):
     def listar_custos_estoque_por_data(self, data_inicio: date, data_fim: date) -> List[CustoEstoqueResponse]:
         ...
 
-    # ✅ NOVOS MÉTODOS DE CATEGORIAS DE CUSTO
     @abstractmethod
     def inserir_categoria_custo(self, nome: str) -> int:
         ...

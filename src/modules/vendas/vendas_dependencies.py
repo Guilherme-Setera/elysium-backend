@@ -16,7 +16,8 @@ from src.modules.vendas.usecase.vendas_usecase import (
     ConfirmarPagamentoVendaUseCase,
     CancelarVendaUseCase,
     BuscarVendaComItensUseCase,
-    ListarVendasNaoPagasUseCase
+    ListarVendasNaoPagasUseCase,
+    RegistrarPagamentoVendaUseCase
     )
 
 
@@ -57,3 +58,7 @@ def get_buscar_venda_com_itens_usecase(session: Session = Depends(get_db)) -> Bu
 def get_listar_vendas_nao_pagas_usecase(session: Session = Depends(get_db)) -> ListarVendasNaoPagasUseCase:
     venda_repo: IVendaRepository = VendaRepository(session)
     return ListarVendasNaoPagasUseCase(venda_repo)
+
+def get_registrar_pagamento_venda_usecase(session: Session = Depends(get_db)) -> RegistrarPagamentoVendaUseCase:
+    venda_repo: IVendaRepository = VendaRepository(session)
+    return RegistrarPagamentoVendaUseCase(venda_repo)

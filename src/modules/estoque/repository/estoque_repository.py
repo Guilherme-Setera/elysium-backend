@@ -1,9 +1,10 @@
 import os
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
 from src.modules.estoque.dto.dto import (
     MovimentacaoCreate,
@@ -17,8 +18,8 @@ from src.modules.estoque.dto.dto import (
     CustoOperacionalCreate,
     CustoOperacionalResponse,
     CustoEstoqueResponse,
-    CategoriaCustoResponse
-
+    CategoriaCustoResponse,
+    MovimentacaoUpdate
 )
 from src.modules.estoque.abc_classes.estoque_abc import IEstoqueRepository
 
@@ -71,37 +72,70 @@ class EstoqueRepository(IEstoqueRepository):
         return ids
 
     def registrar_movimentacao(self, data: MovimentacaoCreate) -> int:
-        # Usa a data fornecida, ou fallback para hoje
-        data_ref = data.data_referencia or date.today()
-
-        # 1. Registrar movimentação
-        mov_query_path = os.path.join(QUERIES_FOLDER, "insert_movimentacao_estoque.sql")
+        mov_query_path = os.path.join(QUERIES_FOLDER, "insert_movimentacao_estoque_produtos.sql")
         mov_query = open(mov_query_path).read()
+
+        data_mov = data.data_mov or datetime.now()
 
         mov_result = self.session.execute(text(mov_query), {
             "produto_id": data.produto_id,
             "quantidade": data.quantidade,
             "operacao_id": data.operacao_id,
-            "data_mov": data_ref
+            "venda_id": data.venda_id,
+            "data_mov": data_mov,
+            "lote_numero": data.lote_numero,
+            "data_validade": data.data_validade,
+            "preco_custo": data.preco_custo,
+            "preco_venda": data.preco_venda,
+            "tipo": data.tipo
         }).fetchone()
-
-        # 2. Se houver preço informado, encerrar anterior e inserir novo
-        if data.preco_custo is not None and data.preco_venda is not None:
-            self.encerrar_precos_produto(data.produto_id)
-
-            preco_query_path = os.path.join(QUERIES_FOLDER, "insert_produto_preco.sql")
-            preco_query = open(preco_query_path).read()
-
-            self.session.execute(text(preco_query), {
-                "produto_id": data.produto_id,
-                "data_referencia": data_ref,
-                "preco_custo": data.preco_custo,
-                "preco_venda": data.preco_venda,
-            })
 
         self.session.commit()
         return mov_result[0] if mov_result else -1
 
+    def atualizar_movimentacao(self, id: int, data: MovimentacaoUpdate) -> int:
+        upd_sql = open(os.path.join(QUERIES_FOLDER, "update_movimentacao_estoque_produtos.sql")).read()
+        insert_preco_sql = open(os.path.join(QUERIES_FOLDER, "insert_produto_preco.sql")).read()
+
+        with self.session.begin():
+            row = self.session.execute(
+                text(upd_sql),
+                {
+                    "id": id,
+                    "produto_id": data.produto_id,
+                    "tipo": data.tipo,
+                    "quantidade": data.quantidade,
+                    "data_mov": data.data_mov,
+                    "operacao_id": data.operacao_id,
+                    "venda_id": data.venda_id,
+                    "lote_numero": data.lote_numero,
+                    "data_validade": data.data_validade,
+                    "preco_custo": data.preco_custo,
+                    "preco_venda": data.preco_venda,
+                },
+            ).fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="Movimentação não encontrada ou vinculada a venda.")
+
+            mov_id, produto_id, tipo, data_mov, _op_id = row
+            data_ref = (data_mov.date() if hasattr(data_mov, "date") else data_mov) or date.today()
+
+            if data.preco_custo is not None and data.preco_venda is not None:
+                if (tipo or "").lower() != "entrada":
+                    raise HTTPException(status_code=400, detail="Preço só pode ser ajustado em movimentações de entrada.")
+                self.encerrar_precos_produto(produto_id)
+                self.session.execute(
+                    text(insert_preco_sql),
+                    {
+                        "produto_id": produto_id,
+                        "data_referencia": data_ref,
+                        "preco_custo": data.preco_custo,
+                        "preco_venda": data.preco_venda,
+                    },
+                )
+
+            return int(mov_id)
 
     def inserir_preco_produto(self, produto_id: int, preco_custo: float, preco_venda: float, data: date) -> int:
         query_path = os.path.join(QUERIES_FOLDER, "insert_produto_preco.sql")
@@ -173,22 +207,35 @@ class EstoqueRepository(IEstoqueRepository):
 
     def listar_estoque_atual(self, data_referencia: date) -> list[EstoqueAtualResponse]:
         query_path = os.path.join(QUERIES_FOLDER, "select_estoque_atual.sql")
-        query = open(query_path).read()
+        with open(query_path, encoding="utf-8") as f:
+            query = f.read()
 
-        result = self.session.execute(text(query), {"data_referencia": data_referencia})
+        # ✅ passe somente o bind que a SQL espera
+        result = self.session.execute(
+            text(query),
+            {"data_referencia": data_referencia}
+        )
         rows = result.fetchall()
 
-        return [
-            EstoqueAtualResponse(
-                produto_id=row[0],
-                nome_produto=row[1],
-                saldo_estoque=row[2],
-                preco_custo=row[3],
-                preco_venda=row[4],
-                data_movimentacao=row[5].date(),
+        responses: list[EstoqueAtualResponse] = []
+        for row in rows:
+            responses.append(
+                EstoqueAtualResponse(
+                    produto_id=row.produto_id,
+                    nome_produto=row.nome_produto,
+                    saldo_estoque=row.saldo_estoque,
+                    preco_custo=row.preco_custo,
+                    preco_venda=row.preco_venda,
+                    data_movimentacao=row.data_movimentacao,
+                    ultima_mov_id=row.ultima_mov_id,
+                    ultima_quantidade=row.ultima_quantidade,
+                    tipo_ultima=row.tipo_ultima,
+                    operacao_id_ultima=row.operacao_id_ultima,
+                    lote_ultimo=row.lote_ultimo,
+                )
             )
-            for row in rows
-        ]
+        return responses
+
 
     def listar_estoque_baixo(self) -> list[EstoqueBaixoResponse]:
         query_path = os.path.join(QUERIES_FOLDER, "select_estoque_baixo.sql")
@@ -243,11 +290,10 @@ class EstoqueRepository(IEstoqueRepository):
         query_path = os.path.join(QUERIES_FOLDER, "insert_custo_operacional.sql")
         with open(query_path) as f:
             query = f.read()
-        print("[LOG] Data recebida para salvar:", data.data_referencia, type(data.data_referencia))
         result = self.session.execute(
             text(query),
             {
-                "categoria_id": data.categoria_id,  # agora usamos o ID da categoria
+                "categoria_id": data.categoria_id,
                 "valor": data.valor,
                 "data_referencia": data.data_referencia,
                 "observacao": data.observacao,
@@ -256,16 +302,11 @@ class EstoqueRepository(IEstoqueRepository):
 
         self.session.commit()
         return result[0] if result else -1
-    
+
     def listar_custos_operacionais(self, data_inicio: date, data_fim: date) -> list[CustoOperacionalResponse]:
         query_path = os.path.join(QUERIES_FOLDER, "select_custos_operacionais_por_data.sql")
         with open(query_path) as f:
             query = f.read()
-
-        # ✅ Log de depuração das datas
-        print("[DEBUG] Datas recebidas no listar_custos_operacionais:")
-        print(f"  → data_inicio: {data_inicio} ({type(data_inicio)})")
-        print(f"  → data_fim: {data_fim} ({type(data_fim)})")
 
         rows = self.session.execute(
             text(query),
@@ -274,11 +315,6 @@ class EstoqueRepository(IEstoqueRepository):
                 "data_fim": data_fim
             }
         ).fetchall()
-
-        # ✅ Log de retorno das linhas
-        print("[DEBUG] Linhas retornadas:")
-        for row in rows:
-            print(f"  → data_referencia: {row[4]} ({type(row[4])})")
 
         return [
             CustoOperacionalResponse(
@@ -291,7 +327,7 @@ class EstoqueRepository(IEstoqueRepository):
             )
             for row in rows
         ]
-    
+
     def listar_custos_estoque_por_data(self, data_inicio: date, data_fim: date) -> list[CustoEstoqueResponse]:
         query_path = os.path.join(QUERIES_FOLDER, "select_custos_estoque_por_data.sql")
         query = open(query_path).read()
@@ -312,7 +348,7 @@ class EstoqueRepository(IEstoqueRepository):
             )
             for row in rows
         ]
-    
+
     def inserir_categoria_custo(self, nome: str) -> int:
         query_path = os.path.join(QUERIES_FOLDER, "insert_categoria_custo.sql")
         query = open(query_path).read()

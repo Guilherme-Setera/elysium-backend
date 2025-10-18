@@ -1,4 +1,4 @@
-UPDATE ambrosia.produtos
+UPDATE elysium.produtos
 SET
     nome = COALESCE(:nome, nome),
     descricao = COALESCE(:descricao, descricao),

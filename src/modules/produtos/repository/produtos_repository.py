@@ -3,75 +3,67 @@ from datetime import date
 from typing import Optional, List, cast
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from sqlalchemy.engine import CursorResult, Result
+from sqlalchemy.engine import CursorResult
 
-from src.modules.produtos.controller.dto import ProdutoCreate, ProdutoUpdate, ProdutoResponse, ProdutoPrecoResponse
+from src.modules.produtos.controller.dto import (
+    ProdutoCadastro,
+    ProdutoUpdate,
+    ProdutoResponse,
+    ProdutoPrecoResponse,
+)
 
 BASE_DIR: str = os.path.dirname(__file__)
 QUERIES_FOLDER: str = os.path.join(BASE_DIR, "queries", "postgres")
+
 
 class ProdutosRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def cadastrar_produto(self, produto: ProdutoCreate) -> int:
-        # 1. Insere o produto
+    def cadastrar_produto(self, produto: ProdutoCadastro) -> int:
         query_path = os.path.join(QUERIES_FOLDER, "insert_produto.sql")
-        query: str = open(query_path).read()
-        result = self.session.execute(
-            text(query),
-            {
-                "nome": produto.nome,
-                "descricao": produto.descricao,
-                "validade": produto.validade
-            }
-        ).fetchone()
-        produto_id = result[0] if result else -1
-
-        # 2. Insere o preço inicial
-        query_path_preco = os.path.join(QUERIES_FOLDER, "insert_produto_preco.sql")
-        query_preco: str = open(query_path_preco).read()
-        self.session.execute(
-            text(query_preco),
-            {
-                "produto_id": produto_id,
-                "data_referencia": produto.data_referencia or date.today(),
-                "preco_custo": produto.preco_custo,
-                "preco_venda": produto.preco_venda
-            }
-        )
-        self.session.commit()
-        return produto_id
+        query = open(query_path).read()
+        with self.session.begin():
+            produto_id = self.session.execute(
+                text(query),
+                {
+                    "nome": produto.nome,
+                    "descricao": produto.descricao,
+                    "meses_para_vencer": getattr(produto, "meses_para_vencer", None),
+                    "ativo": getattr(produto, "ativo", True),
+                    "estoque_minimo": getattr(produto, "estoque_minimo", None),
+                },
+            ).scalar_one()
+        return int(produto_id)
 
     def listar_produtos(self, data_referencia: Optional[date] = None) -> List[ProdutoResponse]:
-        # Usa a query que aceita data_referencia como parâmetro
         query_path = os.path.join(QUERIES_FOLDER, "select_produtos.sql")
         query: str = open(query_path).read()
-        rows = self.session.execute(
-            text(query),
-            {"data_referencia": data_referencia or date.today()}
-        ).fetchall()
-        return [
-            ProdutoResponse(
-                id=row.id,
-                nome=row.nome,
-                descricao=row.descricao,
-                validade=row.validade,
-                ativo=row.ativo,
-                preco_custo=row.preco_custo,
-                estoque_minimo=row.estoque_minimo,
-                preco_venda=row.preco_venda,
-                data_preco=row.data_preco,
+        rows = self.session.execute(text(query)).fetchall()
+        res: List[ProdutoResponse] = []
+        for row in rows:
+            m = row._mapping
+            res.append(
+                ProdutoResponse(
+                    id=m["id"],
+                    nome=m["nome"],
+                    descricao=m.get("descricao"),
+                    meses_para_vencer=m.get("meses_para_vencer"),
+                    ativo=m["ativo"],
+                    estoque_minimo=m.get("estoque_minimo"),
+                    preco_custo=m.get("preco_custo"),
+                    preco_venda=m.get("preco_venda"),
+                    data_preco=m.get("data_preco"),
+                )
             )
-            for row in rows
-        ]
+        return res
 
     def listar_precos_produto(self, produto_id: int) -> List[ProdutoPrecoResponse]:
         query_path = os.path.join(QUERIES_FOLDER, "select_precos_produto.sql")
         query: str = open(query_path).read()
         rows = self.session.execute(
             text(query),
-            {"produto_id": produto_id}
+            {"produto_id": produto_id},
         ).fetchall()
         return [
             ProdutoPrecoResponse(
@@ -87,25 +79,31 @@ class ProdutosRepository:
     def inserir_novo_preco(self, produto_id: int, data_referencia: date, preco_custo: float, preco_venda: float) -> int:
         query_path = os.path.join(QUERIES_FOLDER, "insert_produto_preco.sql")
         query: str = open(query_path).read()
-        result = cast(CursorResult, self.session.execute(
-            text(query),
-            {
-                "produto_id": produto_id,
-                "data_referencia": data_referencia,
-                "preco_custo": preco_custo,
-                "preco_venda": preco_venda,
-            }
-        ))
+        result = cast(
+            CursorResult,
+            self.session.execute(
+                text(query),
+                {
+                    "produto_id": produto_id,
+                    "data_referencia": data_referencia,
+                    "preco_custo": preco_custo,
+                    "preco_venda": preco_venda,
+                },
+            ),
+        )
         self.session.commit()
         return result.rowcount
 
     def desativar_produto(self, produto_id: int) -> int:
         query_path = os.path.join(QUERIES_FOLDER, "desativar_produto.sql")
         query: str = open(query_path).read()
-        result = cast(CursorResult, self.session.execute(
-            text(query),
-            {"id": produto_id}
-        ))
+        result = cast(
+            CursorResult,
+            self.session.execute(
+                text(query),
+                {"id": produto_id},
+            ),
+        )
         self.session.commit()
         return result.rowcount
 
@@ -125,21 +123,19 @@ class ProdutosRepository:
         query: str = open(query_path).read()
         row = self.session.execute(
             text(query),
-            {
-                "id": produto_id,
-                "data_referencia": data_referencia or date.today()
-            }
+            {"id": produto_id},
         ).fetchone()
         if not row:
             return None
+        m = row._mapping
         return ProdutoResponse(
-            id=row.id,
-            nome=row.nome,
-            descricao=row.descricao,
-            validade=row.validade,
-            ativo=row.ativo,
-            estoque_minimo=row.estoque_minimo,
-            preco_custo=row.preco_custo,
-            preco_venda=row.preco_venda,
-            data_preco=row.data_preco,
+            id=m["id"],
+            nome=m["nome"],
+            descricao=m.get("descricao"),
+            meses_para_vencer=m.get("meses_para_vencer"),
+            ativo=m["ativo"],
+            estoque_minimo=m.get("estoque_minimo"),
+            preco_custo=m.get("preco_custo"),
+            preco_venda=m.get("preco_venda"),
+            data_preco=m.get("data_preco"),
         )

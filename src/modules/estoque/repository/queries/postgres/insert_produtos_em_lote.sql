@@ -1,4 +1,4 @@
-INSERT INTO ambrosia.produtos (
+INSERT INTO elysium.produtos (
     nome,
     descricao,
     validade,

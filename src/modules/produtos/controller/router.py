@@ -8,7 +8,7 @@ from src.infra.db.connection import get_db
 from src.modules.produtos.repository.produtos_repository import ProdutosRepository
 from src.modules.produtos.usecase.produtos_usecase import ProdutosUseCase
 from src.modules.produtos.controller.dto import (
-    ProdutoCreate,
+    ProdutoCadastro,
     ProdutoUpdate,
     ProdutoResponse,
     ProdutoPrecoResponse,
@@ -22,7 +22,7 @@ def get_usecase(db: Session = Depends(get_db)) -> ProdutosUseCase:
     return ProdutosUseCase(repo)
 
 @router.post("/", response_model=int, status_code=status.HTTP_201_CREATED)
-def criar_produto(data: ProdutoCreate, usecase: ProdutosUseCase = Depends(get_usecase)):
+def criar_produto(data: ProdutoCadastro, usecase: ProdutosUseCase = Depends(get_usecase)):
     return usecase.cadastrar_produto(data)
 
 @router.get("/", response_model=List[ProdutoResponse])
@@ -59,9 +59,7 @@ def atualizar_produtos_em_lote(
     updates: list[ProdutoUpdateComId],
     usecase: ProdutosUseCase = Depends(get_usecase)
 ):
-    atualizados = usecase.atualizar_produtos_em_lote(updates)
-    return atualizados
-
+    return usecase.atualizar_produtos_em_lote(updates)
 
 @router.delete("/{produto_id}", response_model=bool)
 def desativar_produto(

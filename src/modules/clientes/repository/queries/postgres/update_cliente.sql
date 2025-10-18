@@ -1,4 +1,4 @@
-UPDATE ambrosia.clientes
+UPDATE elysium.clientes
 SET nome = :nome,
     celular = :celular,
     endereco = :endereco,

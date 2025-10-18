@@ -14,7 +14,8 @@ from src.modules.estoque.dto.dto import (
     CustoOperacionalResponse,
     CustoEstoqueResponse,
     CategoriaCustoResponse,
-    CategoriaCustoCreate
+    CategoriaCustoCreate,
+    MovimentacaoUpdate
 )
 from src.modules.estoque.abc_classes.estoque_abc import IEstoqueRepository
 
@@ -25,6 +26,9 @@ class EstoqueUseCase:
 
     def registrar_movimentacao(self, data: MovimentacaoCreate) -> int:
         return self.repo.registrar_movimentacao(data)
+
+    def editar_movimentacao(self, mov_id: int, data: MovimentacaoUpdate) -> int:
+        return self.repo.atualizar_movimentacao(mov_id, data)
 
     def listar_estoque_atual(self, data_referencia: date) -> List[EstoqueAtualResponse]:
         return self.repo.listar_estoque_atual(data_referencia)
@@ -55,7 +59,7 @@ class EstoqueUseCase:
 
     def listar_precos_produto(self, produto_id: int) -> List[ProdutoPrecoResponse]:
         return self.repo.listar_precos_produto(produto_id)
-    
+
     def inserir_custo_operacional(self, data: CustoOperacionalCreate) -> int:
         return self.repo.inserir_custo_operacional(data)
 
@@ -65,10 +69,8 @@ class EstoqueUseCase:
     def listar_custos_estoque_por_data(self, data_inicio: date, data_fim: date) -> List[CustoEstoqueResponse]:
         return self.repo.listar_custos_estoque_por_data(data_inicio, data_fim)
 
-    # 🆕 Métodos para categorias de custo
     def inserir_categoria_custo(self, data: CategoriaCustoCreate) -> int:
         return self.repo.inserir_categoria_custo(data.nome)
-
 
     def listar_categorias_custo(self) -> List[CategoriaCustoResponse]:
         return self.repo.listar_categorias_custo()

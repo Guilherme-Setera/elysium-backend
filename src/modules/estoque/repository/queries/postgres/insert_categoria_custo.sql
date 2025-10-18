@@ -1,4 +1,4 @@
-INSERT INTO ambrosia.categorias_custo (
+INSERT INTO elysium.categorias_custo (
     nome
 )
 VALUES (

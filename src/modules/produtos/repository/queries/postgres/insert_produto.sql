@@ -1,3 +1,15 @@
-INSERT INTO ambrosia.produtos (nome, descricao, validade, ativo)
-VALUES (:nome, :descricao, :validade, true)
+INSERT INTO elysium.produtos (
+  nome,
+  descricao,
+  meses_para_vencer,
+  ativo,
+  estoque_minimo
+)
+VALUES (
+  :nome,
+  :descricao,
+  :meses_para_vencer,
+  :ativo,
+  :estoque_minimo
+)
 RETURNING id;

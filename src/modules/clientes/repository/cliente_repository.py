@@ -47,7 +47,7 @@ class ClienteRepository(IClienteRepository):
             params[f'descricao{idx}'] = c.descricao
 
         query = f"""
-        INSERT INTO ambrosia.clientes (nome, celular, endereco, email, cpf, descricao)
+        INSERT INTO elysium.clientes (nome, celular, endereco, email, cpf, descricao)
         VALUES {', '.join(values)}
         RETURNING id;
         """

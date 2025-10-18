@@ -4,7 +4,7 @@ from jose import JWTError
 from typing import Callable
 from src.modules.auth.security.token_utils import decode_access_token
 from src.modules.auth.repository.auth_repository import AuthRepository
-from infra.db.connection import get_postgres_cursor
+from src.infra.db.connection import get_postgres_cursor
 from psycopg2.extensions import cursor as PGCursor
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/autenticacao/auth_form")

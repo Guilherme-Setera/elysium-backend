@@ -1,4 +1,4 @@
-INSERT INTO ambrosia.clientes (
+INSERT INTO elysium.clientes (
   nome,
   celular,
   endereco,

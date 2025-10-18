@@ -1,4 +1,4 @@
-INSERT INTO ambrosia.produtos_precos (
+INSERT INTO elysium.produtos_precos (
   produto_id,
   data_referencia,
   preco_custo,

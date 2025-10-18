@@ -1,4 +1,4 @@
-INSERT INTO ambrosia.custos_operacionais (
+INSERT INTO elysium.custos_operacionais (
     categoria_id,
     valor,
     data_referencia,

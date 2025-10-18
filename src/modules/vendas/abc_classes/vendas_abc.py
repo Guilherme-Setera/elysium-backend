@@ -1,39 +1,49 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Sequence, Optional
+from typing import Optional, List
 
 from src.modules.vendas.dto.dto import (
     VendaCreate,
+    VendaUpdate,
     ItemVendaCreate,
-    ItemVendaResponse, 
-    VendaResponse
+    ItemVendaResponse,
+    VendaResponse,
+    RegistrarPagamentoDTO,
 )
 
-
 class IVendaRepository(ABC):
-
     @abstractmethod
     def inserir_venda(self, venda: VendaCreate, total: float) -> int:
         ...
 
     @abstractmethod
-    def inserir_item_venda(self, venda_id: int, item: ItemVendaCreate) -> None:
+    def inserir_item_venda(self, venda_id: int, item: ItemVendaCreate) -> int:
         ...
 
     @abstractmethod
-    def buscar_vendas(self) -> Sequence[dict]:
+    def buscar_vendas(self) -> List[VendaResponse]:
         ...
 
     @abstractmethod
-    def buscar_itens_por_venda_id(self, venda_id: int) -> Sequence[dict]:
+    def buscar_itens_por_venda_id(self, venda_id: int) -> List[ItemVendaResponse]:
         ...
 
     @abstractmethod
-    def registrar_entrada_por_devolucao(self, produto_id: int, quantidade: int, data_mov: datetime) -> int:
+    def registrar_saida_por_venda(self, produto_id: int, quantidade: int, data_mov: datetime, venda_id: int) -> int:
         ...
 
     @abstractmethod
-    def atualizar_venda(self, venda_id: int, venda: VendaCreate, total: float) -> None:
+    def registrar_entrada_por_devolucao(
+        self,
+        produto_id: int,
+        quantidade: int,
+        data_mov: datetime,
+        venda_id: Optional[int] = None,
+    ) -> Optional[int]:
+        ...
+
+    @abstractmethod
+    def atualizar_venda(self, venda_id: int, venda: VendaUpdate, total: float) -> None:
         ...
 
     @abstractmethod
@@ -41,7 +51,7 @@ class IVendaRepository(ABC):
         ...
 
     @abstractmethod
-    def cancelar_venda(self, venda_id: int, itens: list[ItemVendaResponse]) -> None:
+    def cancelar_venda(self, venda_id: int, itens: List[ItemVendaResponse]) -> None:
         ...
 
     @abstractmethod
@@ -52,7 +62,14 @@ class IVendaRepository(ABC):
     def deletar_itens_da_venda(self, venda_id: int) -> None:
         ...
 
+    @abstractmethod
+    def deletar_movimentacoes_por_venda(self, venda_id: int) -> None:
+        ...
 
     @abstractmethod
-    def listar_vendas_nao_pagas(self) -> list[VendaResponse]:
-       ...      
+    def listar_vendas_nao_pagas(self) -> List[VendaResponse]:
+        ...
+
+    @abstractmethod
+    def registrar_pagamento_venda(self, data: RegistrarPagamentoDTO) -> bool:
+        ...

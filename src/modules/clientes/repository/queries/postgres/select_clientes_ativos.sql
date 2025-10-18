@@ -7,6 +7,6 @@ SELECT
   cpf,
   descricao,
   dt_start
-FROM ambrosia.clientes
+FROM elysium.clientes
 WHERE ativo = true
 ORDER BY nome;

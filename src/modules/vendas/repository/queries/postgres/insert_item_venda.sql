@@ -1,4 +1,4 @@
-INSERT INTO ambrosia.itens_venda (
+INSERT INTO elysium.itens_venda (
   venda_id,
   produto_id,
   quantidade,
@@ -9,4 +9,5 @@ VALUES (
   :produto_id,
   :quantidade,
   :preco_unitario
-);
+)
+RETURNING id;

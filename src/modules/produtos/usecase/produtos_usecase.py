@@ -3,7 +3,7 @@ from typing import Optional, List
 
 from src.modules.produtos.repository.produtos_repository import ProdutosRepository
 from src.modules.produtos.controller.dto import (
-    ProdutoCreate,
+    ProdutoCadastro,
     ProdutoUpdate,
     ProdutoResponse,
     ProdutoPrecoResponse,
@@ -14,7 +14,7 @@ class ProdutosUseCase:
     def __init__(self, repository: ProdutosRepository):
         self.repository = repository
 
-    def cadastrar_produto(self, data: ProdutoCreate) -> int:
+    def cadastrar_produto(self, data: ProdutoCadastro) -> int:
         return self.repository.cadastrar_produto(data)
 
     def listar_produtos(self, data_referencia: Optional[date] = None) -> List[ProdutoResponse]:
@@ -34,7 +34,7 @@ class ProdutosUseCase:
     def atualizar_produto(self, produto_id: int, data: ProdutoUpdate) -> bool:
         linhas_afetadas = self.repository.atualizar_produto(produto_id, data)
         return linhas_afetadas > 0
-    
+
     def atualizar_produtos_em_lote(self, updates: list[ProdutoUpdateComId]) -> int:
         count = 0
         for item in updates:
