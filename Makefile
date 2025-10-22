@@ -2,16 +2,28 @@
 	lint-files check-lint \
 	setup-environment rebuild-images-and-setup-environment \
 	turn-down-environment turn-down-environment-and-destroy-volumes \
+	run run-local run-prod backend-run \
 	run-tests test \
-	run backend-run init-pkgs clean freeze lint
+	init-pkgs clean freeze lint
 
 ## ----------------------------
 ## Execução da API
 ## ----------------------------
 
-# Executa a API principal (assumindo main.py na raiz do backend/)
+# Execução padrão (mantida)
 run:
 	PYTHONPATH=./src python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Executa a API local com CORS liberado e ENV=local
+run-local:
+	ENVIRONMENT=local \
+	ORIGINS='["http://localhost:3000","http://127.0.0.1:3000","https://elysium-fronted.vercel.app"]' \
+	PYTHONPATH=./src python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Executa a API em modo produção (por exemplo, no servidor)
+run-prod:
+	ENVIRONMENT=production \
+	PYTHONPATH=./src python -m uvicorn main:app --host 0.0.0.0 --port 8000
 
 # Executa a API no modo docker (porta 8100)
 backend-run:
@@ -68,7 +80,6 @@ test:
 ## Utilitários
 ## ----------------------------
 
-# Cria __init__.py em todos os pacotes de src
 init-pkgs:
 	find src -type d -exec touch {}/__init__.py \;
 

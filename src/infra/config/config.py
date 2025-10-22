@@ -2,15 +2,42 @@
 import os
 import json
 import urllib.parse
+from typing import Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import computed_field, model_validator
+from pydantic import computed_field, model_validator, field_validator
 
-_IS_LOCAL = os.getenv("ENVIRONMENT", "local").lower() == "local"
+ENV_FILE = ".env.local" if os.getenv("ENVIRONMENT", "local").lower() == "local" else None
 
+def _clean_str(v: Any) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, (int, float, bool)):
+        return str(v)
+    # remove espaços e barras invertidas / BOMs acidentais
+    return str(v).strip().rstrip("\\").strip()
+
+def _clean_int(v: Any) -> int:
+    if isinstance(v, int):
+        return v
+    s = _clean_str(v)
+    # tenta parse direto
+    try:
+        return int(s)
+    except Exception:
+        # fallback: remove caracteres que não são dígitos / sinal
+        import re
+        s2 = re.sub(r"[^\d\-+]", "", s)
+        return int(s2) if s2 else 0
+
+def _clean_bool(v: Any) -> bool:
+    if isinstance(v, bool):
+        return v
+    s = _clean_str(v).lower()
+    return s in {"1", "true", "t", "yes", "y", "on"}
 
 class ApiSettings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env.local",) if _IS_LOCAL else None,
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
         extra="allow",
@@ -25,7 +52,7 @@ class ApiSettings(BaseSettings):
     POSTGRES_DATABASE: str
     POSTGRES_USERNAME: str
     POSTGRES_PASSWORD: str
-    POSTGRES_SSLMODE: str | None = None
+    POSTGRES_SSLMODE: str | None = None  # será ajustado automaticamente
 
     SQLSERVER_SERVER: str = ""
     SQLSERVER_DATABASE: str = ""
@@ -41,6 +68,33 @@ class ApiSettings(BaseSettings):
 
     ORIGINS: str = "*"
 
+    # ---------- Normalizadores (antes de validar) ----------
+    @field_validator(
+        "POSTGRES_SERVER",
+        "POSTGRES_DATABASE",
+        "POSTGRES_USERNAME",
+        "POSTGRES_PASSWORD",
+        "POSTGRES_SSLMODE",
+        "JWT_ALGORITHM",
+        "JWT_SECRET_KEY",
+        "PROJECT_NAME",
+        "PROJECT_VERSION",
+        "ENVIRONMENT",
+        "ORIGINS",
+        mode="before",
+    )
+    def _strip_strings(cls, v):
+        return _clean_str(v)
+
+    @field_validator("POSTGRES_PORT", "JWT_TOKEN_EXPIRE_MINUTES", "JWT_REFRESH_TOKEN_EXPIRE_DAYS", mode="before")
+    def _coerce_ints(cls, v):
+        return _clean_int(v)
+
+    @field_validator("AUTOCOMMIT", mode="before")
+    def _coerce_bool(cls, v):
+        return _clean_bool(v)
+
+    # ---------- Computed ----------
     @computed_field
     @property
     def origins_list(self) -> list[str]:
@@ -56,6 +110,18 @@ class ApiSettings(BaseSettings):
                 pass
         parts = [p.strip() for p in raw.replace(",", ";").split(";")]
         return [p for p in parts if p]
+
+    def _effective_sslmode(self) -> str | None:
+        # respeita valor explícito se veio
+        if self.POSTGRES_SSLMODE:
+            return self.POSTGRES_SSLMODE
+        host = (self.POSTGRES_SERVER or "").lower()
+        if host.endswith(".flycast") or host in ("localhost", "127.0.0.1"):
+            return "disable"
+        if host.endswith(".fly.dev"):
+            return "require"
+        # default para produção (se preferir exigir SSL, troque para "require")
+        return None
 
     @computed_field
     @property
@@ -97,15 +163,9 @@ class ApiSettings(BaseSettings):
             f"Encrypt=yes;TrustServerCertificate=yes;Connection Timeout=30;"
         )
 
-    def _effective_sslmode(self) -> str | None:
-        if self.POSTGRES_SSLMODE:
-            return self.POSTGRES_SSLMODE
-        if self.ENVIRONMENT.lower() == "local":
-            return "disable"
-        return None
-
+    # ---------- Validações finais ----------
     @model_validator(mode="after")
-    def validar_postgres_obrigatorio(self):
+    def validar_obrigatorios_e_ssl(self):
         if not all(
             [
                 self.POSTGRES_SERVER,
@@ -116,7 +176,8 @@ class ApiSettings(BaseSettings):
             ]
         ):
             raise ValueError("Campos obrigatórios de PostgreSQL/JWT ausentes.")
+        # normaliza sslmode final (preenche se None)
+        self.POSTGRES_SSLMODE = self._effective_sslmode()
         return self
-
 
 settings = ApiSettings()  # type: ignore

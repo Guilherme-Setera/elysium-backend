@@ -19,12 +19,12 @@ primary_region = "gru"
 
   # Liveness: não bate no DB
   [[http_service.checks]]
-    interval = "10s"
-    timeout = "2s"
-    grace_period = "20s"
-    method = "GET"
-    path = "/health"
-    protocol = "http"
+  interval = "10s"
+  timeout = "2s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/api/infra/health"
+  protocol = "http"
 
   # Readiness: testa Postgres
   [[http_service.checks]]

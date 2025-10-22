@@ -51,16 +51,10 @@ class ReceitasRepository(IReceitasRepository):
         check_path = os.path.join(QUERIES_FOLDER, "select_check_itens_producao_para_receita.sql")
         with open(check_path, "r", encoding="utf-8") as f:
             check_sql = f.read()
-
         rows = self.session.execute(
             text(check_sql),
-            {
-                "receita_id": receita_id,
-                "quantidade": quantidade,
-                "is_meia_receita": is_meia_receita,
-            },
+            {"receita_id": receita_id, "quantidade": quantidade, "is_meia_receita": is_meia_receita},
         ).mappings().fetchall()
-
         faltas: List[dict] = []
         for r in rows:
             estoque_atual = float(r["estoque_atual"] or 0)
@@ -88,9 +82,7 @@ class ReceitasRepository(IReceitasRepository):
         return int(row[0]) if row else -1
 
     def fazer_receita(self, data: FazerReceitaInput) -> FazerReceitaResponse:
-        faltas = self._precheck_itens_producao(
-            data.receita_id, data.quantidade, bool(data.is_meia_receita)
-        )
+        faltas = self._precheck_itens_producao(data.receita_id, data.quantidade, bool(data.is_meia_receita))
         if faltas:
             raise EstoqueInsuficienteError(faltas)
 
@@ -126,22 +118,20 @@ class ReceitasRepository(IReceitasRepository):
             produto_mov_id = int(row["produto_mov_id"])
             mp_qtd = float(row["mp_qtd_consumida"] or 0)
             it_qtd = int(row["it_qtd_consumida"] or 0)
+            op_tag = row["op_tag"]
 
             self.session.execute(
                 text(upd_quant_sql),
                 {"rec_id": rec_id, "mp_qtd": mp_qtd, "it_qtd": it_qtd},
             )
-
             self.session.execute(
                 text(recalc_sql),
-                {"rec_id": rec_id},
+                {"rec_id": rec_id, "op_tag": op_tag},
             )
-
             self.session.execute(
                 text(upd_preco_sql),
                 {"produto_mov_id": produto_mov_id},
             )
-
             self.session.commit()
 
             return FazerReceitaResponse(
@@ -152,7 +142,6 @@ class ReceitasRepository(IReceitasRepository):
         except Exception:
             self.session.rollback()
             raise
-
 
     def listar_receitas(
         self,
