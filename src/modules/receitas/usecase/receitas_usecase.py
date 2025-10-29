@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Optional, List
 from datetime import datetime
-from decimal import Decimal
 
 from src.modules.receitas.abc_classes.receitas_abc import IReceitasRepository
 from src.modules.receitas.dto.dto_receitas import (
@@ -33,8 +32,13 @@ class ReceitasUseCase:
         return self.repo.inserir_receita(data)
 
     def fazer_receita(self, data: FazerReceitaInput) -> FazerReceitaResponse:
-        if data.quantidade is None or Decimal(str(data.quantidade)) <= 0:
-            raise ValueError("Quantidade deve ser maior que zero.")
+        consumos = data.consumos or {}
+        mp_list = consumos.get("materias_primas") or []
+        it_list = consumos.get("itens_producao") or []
+        if len(mp_list) + len(it_list) == 0:
+            raise ValueError("Informe 'consumos' com ao menos uma matéria-prima ou item de produção.")
+        if data.produto_final is not None and int(data.produto_final.quantidade_unidades) <= 0:
+            raise ValueError("produto_final.quantidade_unidades deve ser > 0.")
         return self.repo.fazer_receita(data)
 
     def listar_receitas(

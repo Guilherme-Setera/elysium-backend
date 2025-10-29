@@ -42,6 +42,9 @@ def fazer_receita(
         data_mov=data.data_mov,
         is_meia_receita=data.is_meia_receita,
         preco_venda=data.preco_venda,
+        consumos=data.consumos,
+        produto_final=data.produto_final,
+        idempotency_key=data.idempotency_key,
     )
     try:
         return usecase.fazer_receita(payload)

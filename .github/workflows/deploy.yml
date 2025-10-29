@@ -1,0 +1,69 @@
+name: Deploy Elysium Backend (VPS)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "src/**"
+      - "requirements.txt"
+      - "main.py"
+      - ".github/workflows/deploy.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: SSH into VPS and deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            mkdir -p "${{ secrets.VPS_WORKDIR }}"
+            cd "${{ secrets.VPS_WORKDIR }}"
+
+            if [ -d ".git" ]; then
+              git fetch --all
+              git reset --hard origin/main
+            else
+              git clone https://github.com/${{ github.repository }} .
+              git checkout main
+            fi
+
+            # 3) Escreve .env.production com secrets
+            cat > .env.production << 'EOF'
+            ENVIRONMENT=${{ secrets.ENVIRONMENT }}
+            POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
+            POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
+            POSTGRES_DATABASE=${{ secrets.POSTGRES_DATABASE }}
+            POSTGRES_USERNAME=${{ secrets.POSTGRES_USERNAME }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_SSLMODE=${{ secrets.POSTGRES_SSLMODE }}
+            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            JWT_REFRESH_SECRET_KEY=${{ secrets.JWT_REFRESH_SECRET_KEY }}
+            JWT_REFRESH_TOKEN_EXPIRE_DAYS=${{ secrets.JWT_REFRESH_TOKEN_EXPIRE_DAYS }}
+            ORIGINS=${{ secrets.ORIGINS }}
+            PORT=${{ secrets.PORT }}
+            WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY }}
+            EOF
+
+            docker compose pull || true
+            docker compose build --no-cache
+            docker compose up -d
+
+            docker image prune -f
+
+            curl -fsSL http://127.0.0.1:8080/health || (echo "Healthcheck FAIL" && exit 1)
+
+      - name: Done
+        run: echo "Deploy finalizado com sucesso."

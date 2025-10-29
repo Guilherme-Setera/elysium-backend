@@ -4,7 +4,8 @@ INSERT INTO elysium.materias_prima (
   estoque_minimo,
   medida_base,
   is_grama,
-  is_ml
+  is_ml,
+  densidade
 ) VALUES (
   :nome,
   :descricao,
@@ -19,6 +20,10 @@ INSERT INTO elysium.materias_prima (
     WHEN :unidade = 'g'  THEN FALSE
     WHEN :unidade = 'ml' THEN TRUE
     ELSE NOT COALESCE(:is_grama, TRUE)
+  END,
+  CASE
+    WHEN :unidade = 'ml' THEN :densidade
+    ELSE NULL
   END
 )
 RETURNING id;

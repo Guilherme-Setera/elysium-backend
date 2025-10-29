@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Literal
 from decimal import Decimal
 from datetime import date, datetime
@@ -11,10 +11,25 @@ class MateriaPrimaCreate(BaseModel):
     medida_base: Optional[float] = Field(default=1, gt=0)
     is_grama: Optional[bool] = None
     is_ml: Optional[bool] = None
-    unidade: Optional[str] = Field(
+    unidade: Optional[str] = Field(default=None, pattern="^(g|ml)$")
+
+    densidade: Optional[float] = Field(
         default=None,
-        pattern="^(g|ml)$"
+        gt=0,
+        description="Densidade em g/ml; obrigatória quando unidade='ml'"
     )
+
+    @model_validator(mode="after")
+    def _validar_densidade_para_ml(self):
+        eh_ml = (self.unidade == "ml") or (self.is_ml is True) or (self.is_grama is False)
+        eh_g = (self.unidade == "g") or (self.is_grama is True) or (self.is_ml is False)
+
+        if eh_ml and self.densidade is None:
+            raise ValueError("densidade é obrigatória para matérias-primas com unidade 'ml'.")
+        if eh_g and self.densidade is not None:
+            pass
+
+        return self
 
 class MateriaPrimaResponse(BaseModel):
     id: int
@@ -23,7 +38,8 @@ class MateriaPrimaResponse(BaseModel):
     ativo: bool
     estoque_minimo: Optional[Decimal] = None
     medida_base: Decimal
-    unidade_base: Literal['g', 'ml']
+    unidade_base: Literal["g", "ml"]
+    densidade: Optional[Decimal] = Field(default=None, description="Densidade em g/ml (apenas para matérias-primas em ml)")
 
 class MateriaPrimaUpdate(BaseModel):
     nome: Optional[str] = None

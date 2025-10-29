@@ -38,6 +38,7 @@ class MateriaPrimaRepository(IMateriasPrimaRepository):
             "is_grama": materia.is_grama,
             "is_ml": materia.is_ml,
             "unidade": materia.unidade,
+            "densidade": materia.densidade,
         }
 
         result = self.session.execute(text(query), params).fetchone()
@@ -56,7 +57,8 @@ class MateriaPrimaRepository(IMateriasPrimaRepository):
 
     def listar_materias_prima(self) -> list[MateriaPrimaResponse]:
         query_path = os.path.join(QUERIES_FOLDER, "select_materias_prima.sql")
-        query = open(query_path).read()
+        with open(query_path, "r", encoding="utf-8") as f:
+            query = f.read()
 
         rows = self.session.execute(text(query)).fetchall()
 
@@ -69,6 +71,7 @@ class MateriaPrimaRepository(IMateriasPrimaRepository):
                 estoque_minimo=row[4],
                 medida_base=row[5],
                 unidade_base=row[6],
+                densidade=row[7],
             )
             for row in rows
         ]

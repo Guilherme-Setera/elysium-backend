@@ -1,10 +1,12 @@
 import os
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
+from decimal import Decimal
+from fastapi.encoders import jsonable_encoder
 import json
-from decimal import ROUND_FLOOR
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy.sql import text, bindparam
 from sqlalchemy.orm import Session
+from sqlalchemy import Integer, Numeric
 
 from src.modules.receitas.abc_classes.receitas_abc import IReceitasRepository
 from src.modules.receitas.dto.dto_receitas import (
@@ -47,10 +49,13 @@ class ReceitasRepository(IReceitasRepository):
     def __init__(self, session: Session) -> None:
         self.session: Session = session
 
+    def _read_query(self, name: str) -> str:
+        path = os.path.join(QUERIES_FOLDER, name)
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
     def _precheck_itens_producao(self, receita_id: int, quantidade, is_meia_receita: bool) -> List[dict]:
-        check_path = os.path.join(QUERIES_FOLDER, "select_check_itens_producao_para_receita.sql")
-        with open(check_path, "r", encoding="utf-8") as f:
-            check_sql = f.read()
+        check_sql = self._read_query("select_check_itens_producao_para_receita.sql")
         rows = self.session.execute(
             text(check_sql),
             {"receita_id": receita_id, "quantidade": quantidade, "is_meia_receita": is_meia_receita},
@@ -70,10 +75,33 @@ class ReceitasRepository(IReceitasRepository):
                 )
         return faltas
 
+    def _precheck_itens_producao_explicit(self, itens_producao: List[Dict[str, Any]]) -> List[dict]:
+        if not itens_producao:
+            return []
+        ids = [int(it["item_producao_id"]) for it in itens_producao if "item_producao_id" in it]
+        if not ids:
+            return []
+        saldo_sql = self._read_query("select_saldo_itens_producao_por_ids.sql")
+        rows = self.session.execute(text(saldo_sql), {"ids": ids}).mappings().fetchall()
+        estoque_map = {int(r["item_id"]): {"nome": r["nome"], "estoque_atual": float(r["estoque_atual"] or 0)} for r in rows}
+        faltas: List[dict] = []
+        for it in itens_producao:
+            item_id = int(it["item_producao_id"])
+            qtd = int(it["quantidade_itens"])
+            est = estoque_map.get(item_id, {"nome": f"item {item_id}", "estoque_atual": 0.0})
+            if est["estoque_atual"] < qtd:
+                faltas.append(
+                    {
+                        "item_id": item_id,
+                        "nome": est["nome"],
+                        "estoque_atual": est["estoque_atual"],
+                        "consumo_necessario": float(qtd),
+                    }
+                )
+        return faltas
+
     def inserir_receita(self, data: ReceitaCreate) -> int:
-        query_path = os.path.join(QUERIES_FOLDER, "insert_receita.sql")
-        with open(query_path, "r", encoding="utf-8") as f:
-            query = f.read()
+        query = self._read_query("insert_receita.sql")
         params = data.to_sql_params()
         if not params.get("itens"):
             params["itens"] = "[]"
@@ -82,60 +110,78 @@ class ReceitasRepository(IReceitasRepository):
         return int(row[0]) if row else -1
 
     def fazer_receita(self, data: FazerReceitaInput) -> FazerReceitaResponse:
-        faltas = self._precheck_itens_producao(data.receita_id, data.quantidade, bool(data.is_meia_receita))
-        if faltas:
-            raise EstoqueInsuficienteError(faltas)
+        fazer_sql = self._read_query("fazer_receita.sql")
+        recalc_sql = self._read_query("recalcular_custos_receita_por_rec.sql")
+        upd_preco_sql = self._read_query("update_mov_prod_preco_custo_unit.sql")
+        upd_quant_sql = self._read_query("update_mov_receita_quantidades.sql")
+        upd_custos_sql = self._read_query("update_mov_receita_custos.sql")
 
-        fazer_receita_path = os.path.join(QUERIES_FOLDER, "fazer_receita.sql")
-        upd_quant_path = os.path.join(QUERIES_FOLDER, "update_mov_receita_quantidades.sql")
-        recalc_path = os.path.join(QUERIES_FOLDER, "recalcular_custos_receita_por_rec.sql")
-        upd_preco_path = os.path.join(QUERIES_FOLDER, "update_mov_prod_preco_custo_unit.sql")
+        consumos_json = json.dumps(jsonable_encoder(data.consumos or {}))
+        produto_final_json = json.dumps(jsonable_encoder(data.produto_final)) if data.produto_final else None
 
-        with open(fazer_receita_path, "r", encoding="utf-8") as f:
-            fazer_sql = f.read()
-        with open(upd_quant_path, "r", encoding="utf-8") as f:
-            upd_quant_sql = f.read()
-        with open(recalc_path, "r", encoding="utf-8") as f:
-            recalc_sql = f.read()
-        with open(upd_preco_path, "r", encoding="utf-8") as f:
-            upd_preco_sql = f.read()
+        custo_mp_override = None
+        custo_itens_override = None
 
-        qtd_int = int(data.quantidade.to_integral_value(rounding=ROUND_FLOOR))
+        if data.consumos:
+            mp = data.consumos.get("materias_primas") or []
+            it = data.consumos.get("itens_producao") or []
+            soma_mp = sum(Decimal(str(x.get("custo_total", 0))) for x in mp if x.get("custo_total") is not None)
+            soma_it = sum(Decimal(str(x.get("custo_total", 0))) for x in it if x.get("custo_total") is not None)
+            if soma_mp > 0:
+                custo_mp_override = soma_mp
+            if soma_it > 0:
+                custo_itens_override = soma_it
+
+        preco_venda_final = (
+            (data.produto_final.preco_venda if data.produto_final else None)
+            if (data.produto_final and data.produto_final.preco_venda is not None)
+            else data.preco_venda
+        )
 
         try:
             row = self.session.execute(
                 text(fazer_sql),
                 {
                     "receita_id": data.receita_id,
-                    "qtd_prod": qtd_int,
-                    "is_meia": bool(data.is_meia_receita),
-                    "preco_venda": data.preco_venda,
                     "data_mov": data.data_mov,
+                    "preco_venda": preco_venda_final,
+                    "consumos_json": consumos_json,
+                    "produto_final_json": produto_final_json,
                 },
             ).mappings().one()
 
             rec_id = int(row["rec_id"])
-            produto_mov_id = int(row["produto_mov_id"])
-            mp_qtd = float(row["mp_qtd_consumida"] or 0)
-            it_qtd = int(row["it_qtd_consumida"] or 0)
+            produto_mov_id = int(row["produto_mov_id"]) if row.get("produto_mov_id") is not None else -1
             op_tag = row["op_tag"]
+            mp_qtd = float(row.get("mp_qtd_consumida") or 0)
+            it_qtd = int(row.get("it_qtd_consumida") or 0)
 
-            self.session.execute(
-                text(upd_quant_sql),
-                {"rec_id": rec_id, "mp_qtd": mp_qtd, "it_qtd": it_qtd},
-            )
-            self.session.execute(
-                text(recalc_sql),
-                {"rec_id": rec_id, "op_tag": op_tag},
-            )
-            self.session.execute(
-                text(upd_preco_sql),
-                {"produto_mov_id": produto_mov_id},
-            )
+            self.session.execute(text(upd_quant_sql), {"rec_id": rec_id, "mp_qtd": mp_qtd, "it_qtd": it_qtd})
+
+            if (custo_mp_override is not None) or (custo_itens_override is not None):
+                stmt = text(upd_custos_sql).bindparams(
+                    bindparam("rec_id", type_=Integer),
+                    bindparam("custo_mp", type_=Numeric(12, 4)),
+                    bindparam("custo_it", type_=Numeric(12, 4)),
+                )
+                self.session.execute(
+                    stmt,
+                    {
+                        "rec_id": rec_id,
+                        "custo_mp": custo_mp_override,      # pode ser Decimal ou None
+                        "custo_it": custo_itens_override,    # pode ser Decimal ou None
+                    },
+                )
+            else:
+                self.session.execute(text(recalc_sql), {"rec_id": rec_id, "op_tag": op_tag})
+
+            if produto_mov_id and produto_mov_id > 0:
+                self.session.execute(text(upd_preco_sql), {"produto_mov_id": produto_mov_id})
+
             self.session.commit()
 
             return FazerReceitaResponse(
-                produto_mov_id=produto_mov_id,
+                produto_mov_id=produto_mov_id if produto_mov_id > 0 else -1,
                 consumos_reg=int(round(mp_qtd)) + int(it_qtd),
                 produto_preco_id=-1,
             )
@@ -149,9 +195,7 @@ class ReceitasRepository(IReceitasRepository):
         apenas_ativas: Optional[bool] = None,
         produto_id: Optional[int] = None,
     ) -> List[ReceitaResponse]:
-        query_path = os.path.join(QUERIES_FOLDER, "select_receitas_e_itens.sql")
-        with open(query_path, "r", encoding="utf-8") as f:
-            sql = f.read()
+        sql = self._read_query("select_receitas_e_itens.sql")
         rows = (
             self.session.execute(
                 text(sql),
@@ -204,9 +248,7 @@ class ReceitasRepository(IReceitasRepository):
         data_inicio: Optional[datetime] = None,
         data_fim: Optional[datetime] = None,
     ) -> List[ReceitaMovimentacaoResponse]:
-        query_path = os.path.join(QUERIES_FOLDER, "select_receitas_com_precos.sql")
-        with open(query_path, "r", encoding="utf-8") as f:
-            sql = f.read()
+        sql = self._read_query("select_receitas_com_precos.sql")
         rows = (
             self.session.execute(
                 text(sql),

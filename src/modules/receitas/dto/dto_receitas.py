@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, model_validator
 import json
 
+
 class ReceitaItemMateriaPrimaCreate(BaseModel):
     materia_prima_id: int
     quantidade_unidade: Decimal = Field(default=Decimal("1"), ge=Decimal("0"))
@@ -15,12 +16,14 @@ class ReceitaItemMateriaPrimaCreate(BaseModel):
     def quantidade_total(self) -> Decimal:
         return (self.quantidade_unidade or Decimal("1")) * self.quantidade_medida
 
+
 class ReceitaItemMateriaPrimaResponse(BaseModel):
     materia_prima_id: int
     nome_materia_prima: str
     quantidade_unidade: float
     quantidade_medida: float
     is_grama: Optional[bool]
+
 
 class ReceitaItemProducaoCreate(BaseModel):
     item_id: int
@@ -30,12 +33,14 @@ class ReceitaItemProducaoCreate(BaseModel):
     def quantidade_itens_int(self) -> int:
         return int(self.quantidade.to_integral_value(rounding=ROUND_FLOOR))
 
+
 class ReceitaItemProducaoResponse(BaseModel):
     item_id: int
     nome_item: str
     quantidade: float
     unidade: str
     descartavel: bool = True
+
 
 class ReceitaCreate(BaseModel):
     nome: str
@@ -72,14 +77,17 @@ class ReceitaCreate(BaseModel):
             "itens": json.dumps(itens_payload)
         }
 
+
 class ReceitaInsertResponse(BaseModel):
     id: int
+
 
 class ReceitaUpdate(BaseModel):
     nome: Optional[str] = None
     descricao: Optional[str] = None
     ativo: Optional[bool] = None
     meia_receita: Optional[bool] = None
+
 
 class ReceitaResponse(BaseModel):
     id: int
@@ -92,29 +100,58 @@ class ReceitaResponse(BaseModel):
     materias_primas: List[ReceitaItemMateriaPrimaResponse]
     itens_producao: List[ReceitaItemProducaoResponse]
 
+
+class ConsumoMateriaPrima(BaseModel):
+    materia_prima_id: int
+    quantidade: Decimal = Field(..., gt=Decimal("0"))
+    unidade: Optional[str] = None
+    custo_total: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
+
+
+class ConsumoItemProducao(BaseModel):
+    item_producao_id: int
+    quantidade_itens: int = Field(..., gt=0)
+    custo_total: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
+
+
+class ProdutoFinalInfo(BaseModel):
+    quantidade_unidades: int = Field(..., gt=0)
+    preco_venda: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
+
+
 class FazerReceitaBody(BaseModel):
-    quantidade: Decimal = Field(gt=Decimal("0"))
+    quantidade: Optional[Decimal] = Field(default=None, gt=Decimal("0"))
     data_mov: Optional[date] = None
     is_meia_receita: Optional[bool] = False
     preco_venda: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
+    consumos: Optional[Dict[str, List[Dict[str, Any]]]] = None
+    produto_final: Optional[ProdutoFinalInfo] = None
+    idempotency_key: Optional[str] = None
+
 
 class FazerReceitaInput(BaseModel):
     receita_id: int
-    quantidade: Decimal = Field(gt=Decimal("0"))
+    quantidade: Optional[Decimal] = Field(default=None, gt=Decimal("0"))
     data_mov: Optional[date] = None
     is_meia_receita: Optional[bool] = False
     preco_venda: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
+    consumos: Optional[Dict[str, List[Dict[str, Any]]]] = None
+    produto_final: Optional[ProdutoFinalInfo] = None
+    idempotency_key: Optional[str] = None
+
 
 class FazerReceitaResponse(BaseModel):
     produto_mov_id: int
     consumos_reg: int
     produto_preco_id: int
 
+
 class PrecoMateriaPrimaResponse(BaseModel):
     nome: str
     preco_custo: Decimal
     estoque_unidade: Decimal
     estoque_medida: Decimal
+
 
 class PrecoMateriaPrimaUnitarioResponse(BaseModel):
     id: int
@@ -123,11 +160,13 @@ class PrecoMateriaPrimaUnitarioResponse(BaseModel):
     preco_custo: Decimal
     data_fim: Optional[date] = None
 
+
 class ReceitaMovimentacaoFiltro(BaseModel):
     receita_id: Optional[int] = None
     produto_id: Optional[int] = None
     data_inicio: Optional[datetime] = None
     data_fim: Optional[datetime] = None
+
 
 class ReceitaMovimentacaoResponse(BaseModel):
     id: int
