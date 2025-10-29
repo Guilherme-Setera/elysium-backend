@@ -21,12 +21,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Write SSH key from base64 secret
+        shell: bash
         run: |
           umask 077
           echo "${{ secrets.VPS_SSH_KEY_B64 }}" | base64 -d > hostinger_ci
+          chmod 600 hostinger_ci
 
       - name: Show derived fingerprint (from secret)
+        shell: bash
         run: |
+          head -n1 hostinger_ci
+          tail -n1 hostinger_ci
           ssh-keygen -y -f hostinger_ci > hostinger_ci.pub
           ssh-keygen -lf hostinger_ci.pub
           
