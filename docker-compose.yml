@@ -12,7 +12,7 @@ services:
     volumes:
       - elysium-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U elysium -d elysiumdb || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -28,16 +28,33 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    env_file:
-      - .env
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      PORT: ${PORT}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY}
+      ORIGINS: ${ORIGINS}
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE}
+      POSTGRES_USERNAME: ${POSTGRES_USERNAME}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY}
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS}
     ports:
       - "${PORT:-8080}:8080"
-    command: >
-      sh -lc 'exec gunicorn
-      -k uvicorn.workers.UvicornWorker
-      -w ${WEB_CONCURRENCY:-2}
-      -b 0.0.0.0:8080
-      main:app'
+    command: ["gunicorn",
+              "-k","uvicorn.workers.UvicornWorker",
+              "-w","${WEB_CONCURRENCY:-2}",
+              "-b","0.0.0.0:8080",
+              "main:app"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/infra/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
 volumes:
   elysium-pgdata:
