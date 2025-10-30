@@ -52,10 +52,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-
-            # Garante diretório com permissão do usuário SSH
-            sudo mkdir -p "${{ secrets.VPS_WORKDIR }}"
-            sudo chown -R "$USER":"$USER" "${{ secrets.VPS_WORKDIR }}"
+            mkdir -p "${{ secrets.VPS_WORKDIR }}"
             cd "${{ secrets.VPS_WORKDIR }}"
 
             if [ -d ".git" ]; then
