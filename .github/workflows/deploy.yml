@@ -24,37 +24,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare SSH folder
-        shell: bash
-        run: install -m 700 -d ~/.ssh
-
-      - name: Write SSH key
+      - name: Write SSH key to workspace
         shell: bash
         run: |
           umask 077
-          (echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/hostinger_ci) 2>/dev/null || \
-          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/hostinger_ci
-          chmod 600 ~/.ssh/hostinger_ci
+          (echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ./hostinger_ci) 2>/dev/null || \
+          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > ./hostinger_ci
+          chmod 600 ./hostinger_ci
 
-      - name: Show derived fingerprint
+      - name: Prepare known_hosts and test SSH
         shell: bash
         run: |
-          head -n1 ~/.ssh/hostinger_ci
-          tail -n1 ~/.ssh/hostinger_ci
-          ssh-keygen -y -f ~/.ssh/hostinger_ci > ~/.ssh/hostinger_ci.pub
-          ssh-keygen -lf ~/.ssh/hostinger_ci.pub
-
-      - name: Add server to known_hosts
-        shell: bash
-        run: |
+          install -m 700 -d ~/.ssh
           PORT="${{ secrets.VPS_PORT || 22 }}"
           ssh-keyscan -p "$PORT" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Test SSH
-        shell: bash
-        run: |
-          PORT="${{ secrets.VPS_PORT || 22 }}"
-          ssh -i ~/.ssh/hostinger_ci -p "$PORT" -o StrictHostKeyChecking=yes \
+          ssh -i ./hostinger_ci -p "$PORT" -o StrictHostKeyChecking=yes \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "echo connected"
 
       - name: SSH into VPS and deploy
@@ -63,7 +47,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
-          key_path: ~/.ssh/hostinger_ci
+          key_path: ./hostinger_ci
           debug: true
           script_stop: true
           script: |
