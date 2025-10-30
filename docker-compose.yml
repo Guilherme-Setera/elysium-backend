@@ -1,38 +1,32 @@
+version: "3.9"
+
 services:
   db:
     image: postgres:16-alpine
     container_name: elysium-postgres
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env.db
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - elysium-pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 60
-      start_period: 90s
+    ports:
+      - "127.0.0.1:5432:5432"
 
   app:
-    build:
-      context: .
-    image: elysium-backend-app
+    build: .
     container_name: elysium-backend
-    restart: always
+    restart: unless-stopped
+    depends_on:
+      - db
     env_file:
       - .env
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
     command: >
-      gunicorn -k uvicorn.workers.UvicornWorker main:app
-      -b 0.0.0.0:8080
-      --workers ${WEB_CONCURRENCY:-2}
+      sh -lc 'exec gunicorn main:app
+      -k uvicorn.workers.UvicornWorker
+      -w ${WEB_CONCURRENCY:-2}
+      -b 0.0.0.0:8080'
 
 volumes:
   elysium-pgdata:

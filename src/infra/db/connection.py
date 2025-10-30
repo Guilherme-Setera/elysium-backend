@@ -9,10 +9,12 @@ from psycopg2.extensions import connection as PGConnection, cursor as PGCursor
 from psycopg2.extras import RealDictCursor
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.engine.url import URL
+from sqlalchemy.orm import sessionmaker, Session
 
-from src.infra.config.config import settings  # <-- use o settings central
+from src.infra.config.config import settings  # <-- settings centralizado
 
 APP_NAME = "elysium-backend"
+
 
 def _sqlalchemy_url() -> str:
     url = URL.create(
@@ -26,6 +28,7 @@ def _sqlalchemy_url() -> str:
     )
     return str(url)
 
+
 def _psycopg2_dsn() -> str:
     parts = {
         "host": settings.POSTGRES_SERVER,
@@ -36,22 +39,48 @@ def _psycopg2_dsn() -> str:
         "sslmode": settings.POSTGRES_SSLMODE or "disable",
         "application_name": APP_NAME,
     }
+
     def esc(v: str) -> str:
         return v.replace("\\", "\\\\").replace("'", "\\'")
+
     kv = [f"{k}='{esc(v)}'" for k, v in parts.items() if v]
     return " ".join(kv)
+
 
 SQLALCHEMY_DATABASE_URL = settings.POSTGRES_CONN_SQLALCHEMY
 engine: Engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 
+# --- SQLAlchemy Session (sync) para FastAPI ---
+SessionLocal = sessionmaker(
+    bind=engine,
+    autocommit=False,
+    autoflush=False,
+    class_=Session,
+)
+
+
+def get_db() -> Generator[Session, None, None]:
+    """
+    Dependency para FastAPI: abre e fecha Session por request.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# --- psycopg2 direto (quando você precisa de cursor dict) ---
 def get_postgres_connection() -> PGConnection:
     import psycopg2
     return psycopg2.connect(settings.POSTGRES_CONN_PSYCO)
+
 
 @contextmanager
 def get_postgres_cursor() -> Generator[PGCursor, None, None]:
     conn: Optional[PGConnection] = None
     cur: Optional[PGCursor] = None
+
     try:
         conn = get_postgres_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)

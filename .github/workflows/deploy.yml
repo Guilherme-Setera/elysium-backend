@@ -51,26 +51,23 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            echo "USER=$(id -u -n) UID=$(id -u) HOME=$HOME"
             docker --version || true
             docker compose version || true
 
-            WORKDIR="$HOME/elysium-backend"
+            WORKDIR="${{ secrets.VPS_WORKDIR || format('{0}', '$HOME/elysium-backend') }}"
             mkdir -p "$WORKDIR"
             cd "$WORKDIR"
-            stat -c "workdir_owner=%U:%G perms=%A path=%n" . || true
 
             git init -q . || true
             git remote remove origin >/dev/null 2>&1 || true
             git remote add origin "https://github.com/${{ github.repository }}" >/dev/null 2>&1 || true
             git fetch --prune --depth=1 origin main
             git checkout -B main origin/main
-            git rev-parse --short HEAD || true
 
             cat > .env << 'EOF'
             ENVIRONMENT=${{ secrets.ENVIRONMENT }}
-            POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
-            POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
+            POSTGRES_SERVER=db
+            POSTGRES_PORT=5432
             POSTGRES_DATABASE=${{ secrets.POSTGRES_DATABASE }}
             POSTGRES_USERNAME=${{ secrets.POSTGRES_USERNAME }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
@@ -89,27 +86,19 @@ jobs:
             POSTGRES_DB=${{ secrets.POSTGRES_DATABASE }}
             EOF
 
-            ls -l .env .env.db || true
-            wc -c .env .env.db || true
-
-            docker info >/dev/null 2>&1 || { echo "Sem acesso ao Docker. Verifique grupo 'docker' e daemon ativo."; exit 1; }
-            docker compose pull || true
+            docker info >/dev/null 2>&1 || { echo "Docker indisponível"; exit 1; }
             docker compose build --no-cache
             docker compose up -d --remove-orphans
             docker compose ps || true
 
             HEALTH_URL="${{ secrets.HEALTH_URL }}"
             [ -n "$HEALTH_URL" ] || HEALTH_URL="http://127.0.0.1:8080/health"
-            if ! curl -fsS "$HEALTH_URL" >/dev/null; then
-              echo "[WARN] Health falhou em $HEALTH_URL — tentando alternativas…"
+            curl -fsS "$HEALTH_URL" >/dev/null || {
               curl -fsS http://localhost:8080/health >/dev/null || true
               curl -fsS http://0.0.0.0:8080/health >/dev/null || true
-              echo "[INFO] Últimos logs:"
               docker compose logs --no-color --tail=200 || true
               exit 1
-            fi
-
-            echo "[DONE] Deploy concluído com sucesso."
+            }
 
       - name: Done
         run: echo "Deploy finalizado com sucesso."
