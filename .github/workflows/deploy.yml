@@ -54,16 +54,19 @@ jobs:
             echo "USER=$(id -u -n) UID=$(id -u) HOME=$HOME"
             docker --version || true
             docker compose version || true
+
             WORKDIR="$HOME/elysium-backend"
             mkdir -p "$WORKDIR"
             cd "$WORKDIR"
             stat -c "workdir_owner=%U:%G perms=%A path=%n" . || true
+
             git init -q . || true
             git remote remove origin >/dev/null 2>&1 || true
             git remote add origin "https://github.com/${{ github.repository }}" >/dev/null 2>&1 || true
             git fetch --prune --depth=1 origin main
             git checkout -B main origin/main
             git rev-parse --short HEAD || true
+
             cat > .env << 'EOF'
             ENVIRONMENT=${{ secrets.ENVIRONMENT }}
             POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
@@ -79,13 +82,22 @@ jobs:
             PORT=${{ secrets.PORT }}
             WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY }}
             EOF
-            ls -l .env || true
-            wc -c .env || true
+
+            cat > .env.db << 'EOF'
+            POSTGRES_USERNAME=${{ secrets.POSTGRES_USERNAME }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DATABASE=${{ secrets.POSTGRES_DATABASE }}
+            EOF
+
+            ls -l .env .env.db || true
+            wc -c .env .env.db || true
+
             docker info >/dev/null 2>&1 || { echo "Sem acesso ao Docker. Verifique grupo 'docker' e daemon ativo."; exit 1; }
             docker compose pull || true
             docker compose build --no-cache
             docker compose up -d --remove-orphans
             docker compose ps || true
+
             HEALTH_URL="${{ secrets.HEALTH_URL }}"
             [ -n "$HEALTH_URL" ] || HEALTH_URL="http://127.0.0.1:8080/health"
             if ! curl -fsS "$HEALTH_URL" >/dev/null; then
@@ -96,6 +108,7 @@ jobs:
               docker compose logs --no-color --tail=200 || true
               exit 1
             fi
+
             echo "[DONE] Deploy concluído com sucesso."
 
       - name: Done
