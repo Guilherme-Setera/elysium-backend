@@ -74,7 +74,7 @@ jobs:
             git rev-parse --short HEAD || true
 
             # 3) .env.production
-            cat > .env.production << 'EOF'
+            cat > .env << 'EOF'
             ENVIRONMENT=${{ secrets.ENVIRONMENT }}
             POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
             POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
