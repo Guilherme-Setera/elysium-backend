@@ -40,7 +40,7 @@ jobs:
           ssh -i ./hostinger_ci -p "$PORT" -o StrictHostKeyChecking=yes \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "echo connected"
 
-      - name: SSH into VPS and deploy (debug + robust)
+      - name: SSH into VPS and deploy (robust)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -55,11 +55,9 @@ jobs:
             set -x
 
             STEP="env info"
-            echo "USER=$(id -u -n) UID=$(id -u) HOME=$HOME SHELL=$SHELL"
-            command -v git || true
-            git --version || true
-            docker --version || true
-            docker compose version || true
+            echo "USER=$(id -u -n) UID=$(id -u) HOME=$HOME"
+            docker --version
+            docker compose version
 
             STEP="resolve workdir"
             WORKDIR="$HOME/elysium-backend"
@@ -68,7 +66,11 @@ jobs:
             stat -c "workdir_owner=%U:%G perms=%A path=%n" .
 
             STEP="git sync"
-            if [ -d ".git" ]; then
+            set +e
+            [ -d ".git" ]
+            GITDIR_EXISTS=$?
+            set -e
+            if [ "$GITDIR_EXISTS" -eq 0 ]; then
               git fetch --all --prune
               git reset --hard origin/main
             else
@@ -95,9 +97,6 @@ jobs:
             EOF
             ls -l .env.production
             wc -c .env.production
-
-            STEP="docker sanity"
-            docker info >/dev/null 2>&1
 
             STEP="compose pull"
             docker compose pull || true
