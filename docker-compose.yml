@@ -4,11 +4,18 @@ services:
     container_name: elysium-postgres
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.db
     volumes:
       - elysium-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -h 127.0.0.1 -p ${POSTGRES_PORT:-5432}"]
+      test:
+        - CMD-SHELL
+        - >
+          pg_isready
+          -U "$${POSTGRES_USER:-postgres}"
+          -d "$${POSTGRES_DB:-postgres}"
+          -h 127.0.0.1
+          -p "$${POSTGRES_PORT:-5432}"
       interval: 5s
       timeout: 3s
       retries: 15
