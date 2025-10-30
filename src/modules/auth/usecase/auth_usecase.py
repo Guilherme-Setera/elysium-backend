@@ -8,9 +8,7 @@ from src.modules.auth.security import password_utils, token_utils
 from src.infra.db.connection import get_postgres_cursor
 
 def validate_and_create_access_token(req: TokenRequest) -> Token:
-    gen = get_postgres_cursor()
-    cursor = next(gen)
-    try:
+    with get_postgres_cursor() as cursor:
         repository = AuthRepository(cursor)
         users_dict, _ = repository.get_users_details()
         user_data = users_dict.get(req.username)
@@ -33,14 +31,9 @@ def validate_and_create_access_token(req: TokenRequest) -> Token:
             repository.update_totp_last_interval(req.username, current_interval)
         access_token = token_utils.create_access_token({"sub": f"username:{req.username}"})
         return Token(access_token=access_token, token_type="bearer", user=UserOut(full_name=user_data["nome"]))
-    finally:
-        with suppress(StopIteration):
-            next(gen)
 
 def register_user(req: RegisterRequest) -> int:
-    gen = get_postgres_cursor()
-    cursor = next(gen)
-    try:
+    with get_postgres_cursor() as cursor:
         repository = AuthRepository(cursor)
         exists = repository.get_user_by_login(req.email)
         if exists:
@@ -48,14 +41,9 @@ def register_user(req: RegisterRequest) -> int:
         pwd_hash = password_utils.hash_password(req.senha)
         user_id = repository.insert_user(req.nome, req.email, pwd_hash, req.role)
         return user_id
-    finally:
-        with suppress(StopIteration):
-            next(gen)
 
 def change_password(req: ChangePasswordRequest) -> None:
-    gen = get_postgres_cursor()
-    cursor = next(gen)
-    try:
+    with get_postgres_cursor() as cursor:
         repository = AuthRepository(cursor)
         user = repository.get_user_by_id(req.user_id)
         if not user:
@@ -64,6 +52,3 @@ def change_password(req: ChangePasswordRequest) -> None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="senha_atual_invalida")
         new_hash = password_utils.hash_password(req.senha_nova)
         repository.update_password(req.user_id, new_hash)
-    finally:
-        with suppress(StopIteration):
-            next(gen)
