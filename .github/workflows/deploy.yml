@@ -19,18 +19,16 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout (apenas para visibilidade do run)
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Write SSH key
         shell: bash
         run: |
           umask 077
-          # aceita secret puro ou base64
-          (echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > hostinger_ci) 2>/dev/null || printf '%s' "${{ secrets.VPS_SSH_KEY }}" > hostinger_ci
-          chmod 600 hostinger_ci
+          (echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ./hostinger_ci) 2>/dev/null || printf '%s' "${{ secrets.VPS_SSH_KEY }}" > ./hostinger_ci
+          chmod 600 ./hostinger_ci
 
       - name: Prepare known_hosts and test SSH
         shell: bash
@@ -40,64 +38,68 @@ jobs:
           ssh-keyscan -p "$PORT" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
           ssh -i ./hostinger_ci -p "$PORT" -o StrictHostKeyChecking=yes "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "echo connected"
 
-      - name: SSH & Deploy
+      - name: SSH into VPS and deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           key_path: ./hostinger_ci
-          script_stop: true
           debug: true
+          script_stop: true
           script: |
             set -euo pipefail
 
-            WORKDIR="${{ secrets.VPS_WORKDIR }}"
-            if [ -z "${WORKDIR}" ]; then WORKDIR="$HOME/elysium-backend"; fi
+            WORKDIR="${HOME}/elysium-backend"
             mkdir -p "$WORKDIR"
             cd "$WORKDIR"
 
-            echo "[1/6] Sync repo para main (hard reset)"
+            # Sincroniza repo (sempre "hard reset" para evitar sobras locais)
             if [ ! -d .git ]; then
               git init -q
-              git remote add origin "https://github.com/${{ github.repository }}.git"
+              git remote add origin "https://github.com/${{ github.repository }}"
             fi
-            git fetch --no-tags --prune --depth=1 origin main
+            git fetch --prune --depth=1 origin main
+            git checkout -B main origin/main
             git reset --hard origin/main
             git clean -fdx
 
-            echo "[2/6] Escrever .env do app (apenas variáveis do app)"
-            cat > .env <<'ENV'
-            ENVIRONMENT=${{ secrets.ENVIRONMENT || 'production' }}
-            PORT=${{ secrets.PORT || '8080' }}
-            WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY || '2' }}
-            ORIGINS=${{ secrets.ORIGINS || '["https://elysium-fronted.vercel.app","http://localhost:3000"]' }}
+            # .env mínimo e limpo
+            cat > .env << 'EOF'
+            ENVIRONMENT=${{ secrets.ENVIRONMENT }}
+            PORT=${{ secrets.PORT }}
+            WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY }}
+            ORIGINS=${{ secrets.ORIGINS }}
 
             POSTGRES_SERVER=db
             POSTGRES_PORT=5432
-            POSTGRES_DATABASE=${{ secrets.POSTGRES_DATABASE || 'elysiumdb' }}
-            POSTGRES_USERNAME=${{ secrets.POSTGRES_USERNAME || 'elysium' }}
+            POSTGRES_DATABASE=${{ secrets.POSTGRES_DATABASE }}
+            POSTGRES_USERNAME=${{ secrets.POSTGRES_USERNAME }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_SSLMODE=${{ secrets.POSTGRES_SSLMODE || 'disable' }}
+            POSTGRES_SSLMODE=${{ secrets.POSTGRES_SSLMODE }}
 
             JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
             JWT_REFRESH_SECRET_KEY=${{ secrets.JWT_REFRESH_SECRET_KEY }}
-            JWT_REFRESH_TOKEN_EXPIRE_DAYS=${{ secrets.JWT_REFRESH_TOKEN_EXPIRE_DAYS || '7' }}
-            ENV
+            JWT_REFRESH_TOKEN_EXPIRE_DAYS=${{ secrets.JWT_REFRESH_TOKEN_EXPIRE_DAYS }}
+            EOF
 
-            echo "[3/6] Validar docker-compose.yml"
-            docker compose config >/dev/null
+            # Nunca criar .env.db (para não ser acidentalmente consumido)
+            rm -f .env.db docker-compose.override.yml || true
 
-            echo "[4/6] Build e recriar containers"
-            docker compose down --remove-orphans || true
-            docker compose build --pull
-            docker compose up -d --force-recreate
+            echo "[1/6] docker compose build (sem cache)"
+            docker compose build --pull --no-cache
+
+            echo "[2/6] sobe containers"
+            docker compose up -d --force-recreate --remove-orphans
+
+            echo "[3/6] estado:"
             docker compose ps
 
-            echo "[5/6] Esperar Postgres responder (pg_isready dentro do container)"
+            echo "[4/6] Esperar Postgres responder (pg_isready dentro do container)"
             ATTEMPTS=60
+            SLEEP=2
             i=1
-            while ! docker compose exec -T db sh -lc 'pg_isready -h 127.0.0.1 -p 5432' >/dev/null 2>&1; do
+            until docker compose exec -T db sh -lc 'pg_isready -h 127.0.0.1 -p 5432' >/dev/null 2>&1; do
               echo "  tentativa $i/$ATTEMPTS..."
               i=$((i+1))
               if [ $i -gt $ATTEMPTS ]; then
@@ -105,28 +107,37 @@ jobs:
                 docker compose logs --no-color --tail=200 db || true
                 exit 1
               fi
-              sleep 2
+              sleep $SLEEP
             done
             echo "Postgres OK."
 
-            echo "[6/6] Healthcheck do app (rota existente)"
-            HEALTH_URL="${{ secrets.HEALTH_URL }}"
-            if [ -z "$HEALTH_URL" ]; then HEALTH_URL="http://127.0.0.1:8080/api/infra/health"; fi
+            echo "[5/6] Diagnóstico do ambiente do APP (tamanho do env)"
+            SIZE=$(docker compose exec -T app /usr/bin/env | wc -c || echo 0)
+            echo "ENV size (bytes): $SIZE"
+            if [ "${SIZE:-0}" -gt 120000 ]; then
+              echo "ERRO: Ambiente do container está grande demais (>120 KB). Dump de variáveis (top 30 por tamanho):"
+              docker compose exec -T app /usr/bin/env | awk 'BEGIN{FS="="}{print length($0),$1}' | sort -nr | head -30
+              exit 1
+            fi
 
+            echo "[6/6] Healthcheck do app (rota existente)"
             ATTEMPTS=30
+            SLEEP=2
             i=1
-            while ! curl -fsS "$HEALTH_URL" >/dev/null 2>&1; do
+            HEALTH_URL="${{ secrets.HEALTH_URL }}"
+            [ -n "${HEALTH_URL}" ] || HEALTH_URL="http://127.0.0.1:8080/api/infra/health"
+            until curl -fsS "$HEALTH_URL" >/dev/null; do
               echo "  tentativa $i/$ATTEMPTS..."
               i=$((i+1))
               if [ $i -gt $ATTEMPTS ]; then
-                echo "App não respondeu a tempo."
+                echo "App não respondeu no tempo esperado."
                 echo "Logs do app:"
                 docker compose logs --no-color --tail=200 app || true
-                echo "Tente checar também /openapi.json localmente:"
+                echo "Testando /openapi.json:"
                 curl -v http://127.0.0.1:8080/openapi.json || true
                 exit 1
               fi
-              sleep 2
+              sleep $SLEEP
             done
             echo "App OK."
 
