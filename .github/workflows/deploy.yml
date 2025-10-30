@@ -79,7 +79,7 @@ jobs:
             WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY }}
             EOF
 
-            docker info >/dev/null 2>&1 || { echo "Sem acesso ao Docker (daemon). Adicione o usuário 'deploy' ao grupo docker ou faça deploy como root."; exit 1; }
+            docker info >/dev/null 2>&1 || { echo "Sem acesso ao Docker (daemon). Adicione o usuário '${{ secrets.VPS_USER }}' ao grupo docker ou faça deploy como root."; exit 1; }
 
             docker compose pull || true
             docker compose build --no-cache
