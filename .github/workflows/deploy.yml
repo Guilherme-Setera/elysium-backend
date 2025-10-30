@@ -19,12 +19,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Write SSH key to workspace
+      - name: Write SSH key
         shell: bash
         run: |
           umask 077
@@ -52,12 +51,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-
-            WORKDIR="${{ secrets.VPS_WORKDIR }}"
-            if [ -z "$WORKDIR" ]; then
-              WORKDIR="$HOME/elysium-backend"
-            fi
-
+            WORKDIR="$HOME/elysium-backend"
             mkdir -p "$WORKDIR"
             cd "$WORKDIR"
 
@@ -69,7 +63,6 @@ jobs:
               git checkout -f main
             fi
 
-            touch .env.production
             cat > .env.production << 'EOF'
             ENVIRONMENT=${{ secrets.ENVIRONMENT }}
             POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
@@ -85,6 +78,8 @@ jobs:
             PORT=${{ secrets.PORT }}
             WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY }}
             EOF
+
+            docker info >/dev/null 2>&1 || { echo "Sem acesso ao Docker (daemon). Adicione o usuário 'deploy' ao grupo docker ou faça deploy como root."; exit 1; }
 
             docker compose pull || true
             docker compose build --no-cache
