@@ -51,13 +51,21 @@ jobs:
           script_stop: true
           script: |
             set -Eeuo pipefail
-            trap 'echo "[FAIL] step=${STEP:-unknown} line=$LINENO" >&2; exit 1' ERR
+            trap 'echo "[FAIL] step=${STEP:-unknown} line=$LINENO" >&2' ERR
+            set -x
+
+            STEP="env info"
+            echo "USER=$(id -u -n) UID=$(id -u) HOME=$HOME SHELL=$SHELL"
+            command -v git || true
+            git --version || true
+            docker --version || true
+            docker compose version || true
 
             STEP="resolve workdir"
             WORKDIR="$HOME/elysium-backend"
             mkdir -p "$WORKDIR"
             cd "$WORKDIR"
-            echo "[OK] WORKDIR=$WORKDIR owner=$(stat -c "%U:%G" .)"
+            stat -c "workdir_owner=%U:%G perms=%A path=%n" .
 
             STEP="git sync"
             if [ -d ".git" ]; then
@@ -67,7 +75,7 @@ jobs:
               git clone --depth=1 https://github.com/${{ github.repository }} .
               git checkout -f main
             fi
-            echo "[OK] HEAD=$(git rev-parse --short HEAD)"
+            git rev-parse --short HEAD
 
             STEP="write env"
             cat > .env.production << 'EOF'
@@ -85,11 +93,10 @@ jobs:
             PORT=${{ secrets.PORT }}
             WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY }}
             EOF
-            echo "[OK] .env.production bytes=$(wc -c < .env.production)"
+            ls -l .env.production
+            wc -c .env.production
 
             STEP="docker sanity"
-            docker --version
-            docker compose version
             docker info >/dev/null 2>&1
 
             STEP="compose pull"
@@ -103,13 +110,17 @@ jobs:
             docker compose ps
 
             STEP="healthcheck"
-            if ! curl -fsS http://127.0.0.1:8080/health >/dev/null; then
-              echo "[WARN] Health em 127.0.0.1:8080 falhou. Tentando alternativas…"
-              curl -fsS http://localhost:8080/health >/dev/null || true
-              curl -fsS http://0.0.0.0:8080/health >/dev/null || true
-              echo "[INFO] Últimos logs:"
+            HEALTH_URL="${{ secrets.HEALTH_URL }}"
+            if [ -z "${HEALTH_URL}" ]; then
+              HEALTH_URL="http://127.0.0.1:8080/health"
+            fi
+            if ! curl -fsS "$HEALTH_URL" >/dev/null; then
+              echo "[WARN] Health falhou em $HEALTH_URL — tentando alternativas…"
+              for u in http://localhost:8080/health http://0.0.0.0:8080/health; do
+                curl -fsS "$u" >/dev/null && { echo "[OK] Health em $u"; exit 0; } || true
+              done
+              echo "[INFO] Últimos logs dos serviços:"
               docker compose logs --no-color --tail=200 || true
-              echo "Healthcheck FAIL"
               exit 1
             fi
 
