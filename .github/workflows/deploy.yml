@@ -40,7 +40,7 @@ jobs:
           ssh -i ./hostinger_ci -p "$PORT" -o StrictHostKeyChecking=yes \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "echo connected"
 
-      - name: SSH into VPS and deploy
+      - name: SSH into VPS and deploy (debug + robust)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -50,11 +50,16 @@ jobs:
           debug: true
           script_stop: true
           script: |
-            set -euo pipefail
+            set -Eeuo pipefail
+            trap 'echo "[FAIL] step=${STEP:-unknown} line=$LINENO" >&2; exit 1' ERR
+
+            STEP="resolve workdir"
             WORKDIR="$HOME/elysium-backend"
             mkdir -p "$WORKDIR"
             cd "$WORKDIR"
+            echo "[OK] WORKDIR=$WORKDIR owner=$(stat -c "%U:%G" .)"
 
+            STEP="git sync"
             if [ -d ".git" ]; then
               git fetch --all --prune
               git reset --hard origin/main
@@ -62,7 +67,9 @@ jobs:
               git clone --depth=1 https://github.com/${{ github.repository }} .
               git checkout -f main
             fi
+            echo "[OK] HEAD=$(git rev-parse --short HEAD)"
 
+            STEP="write env"
             cat > .env.production << 'EOF'
             ENVIRONMENT=${{ secrets.ENVIRONMENT }}
             POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
@@ -78,14 +85,35 @@ jobs:
             PORT=${{ secrets.PORT }}
             WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY }}
             EOF
+            echo "[OK] .env.production bytes=$(wc -c < .env.production)"
 
-            docker info >/dev/null 2>&1 || { echo "Sem acesso ao Docker (daemon). Adicione o usuário '${{ secrets.VPS_USER }}' ao grupo docker ou faça deploy como root."; exit 1; }
+            STEP="docker sanity"
+            docker --version
+            docker compose version
+            docker info >/dev/null 2>&1
 
+            STEP="compose pull"
             docker compose pull || true
+
+            STEP="compose build"
             docker compose build --no-cache
+
+            STEP="compose up"
             docker compose up -d --remove-orphans
-            docker image prune -f
-            curl -fsS http://127.0.0.1:8080/health || (echo "Healthcheck FAIL" && exit 1)
+            docker compose ps
+
+            STEP="healthcheck"
+            if ! curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              echo "[WARN] Health em 127.0.0.1:8080 falhou. Tentando alternativas…"
+              curl -fsS http://localhost:8080/health >/dev/null || true
+              curl -fsS http://0.0.0.0:8080/health >/dev/null || true
+              echo "[INFO] Últimos logs:"
+              docker compose logs --no-color --tail=200 || true
+              echo "Healthcheck FAIL"
+              exit 1
+            fi
+
+            echo "[DONE] Deploy concluído com sucesso."
 
       - name: Done
         run: echo "Deploy finalizado com sucesso."
