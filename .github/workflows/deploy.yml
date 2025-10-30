@@ -90,11 +90,11 @@ jobs:
             docker compose ps || true
 
             echo "Aguardando Postgres ficar healthy..."
-            ATTEMPTS=40
+            ATTEMPTS=60
             SLEEP=2
             i=1
             until [ "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' elysium-postgres 2>/dev/null || echo starting)" = "healthy" ]; do
-              echo "tentativa $i/$ATTEMPTS"
+              echo "  tentativa $i/$ATTEMPTS..."
               i=$((i+1))
               if [ $i -gt $ATTEMPTS ]; then
                 echo "Postgres não ficou healthy a tempo."
@@ -113,7 +113,7 @@ jobs:
             HEALTH_URL="${{ secrets.HEALTH_URL }}"
             [ -n "${HEALTH_URL}" ] || HEALTH_URL="http://127.0.0.1:8080/health"
             until curl -fsS "$HEALTH_URL" >/dev/null; do
-              echo "tentativa $i/$ATTEMPTS"
+              echo "  tentativa $i/$ATTEMPTS..."
               i=$((i+1))
               if [ $i -gt $ATTEMPTS ]; then
                 echo "App não respondeu no tempo esperado."
