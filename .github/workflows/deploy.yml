@@ -52,8 +52,14 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            mkdir -p "${{ secrets.VPS_WORKDIR }}"
-            cd "${{ secrets.VPS_WORKDIR }}"
+
+            WORKDIR="${{ secrets.VPS_WORKDIR }}"
+            if [ -z "$WORKDIR" ]; then
+              WORKDIR="$HOME/elysium-backend"
+            fi
+
+            mkdir -p "$WORKDIR"
+            cd "$WORKDIR"
 
             if [ -d ".git" ]; then
               git fetch --all --prune
@@ -63,6 +69,7 @@ jobs:
               git checkout -f main
             fi
 
+            touch .env.production
             cat > .env.production << 'EOF'
             ENVIRONMENT=${{ secrets.ENVIRONMENT }}
             POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
