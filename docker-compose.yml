@@ -1,4 +1,3 @@
-# docker-compose.yml
 services:
   db:
     image: postgres:16-alpine
@@ -10,17 +9,16 @@ services:
       POSTGRES_USER: ${POSTGRES_USERNAME}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DATABASE}
-    volumes:
-      - /srv/elysium/pgdata:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
-      # Use socket local -> não exige PGPASSWORD
       test: ["CMD-SHELL", "pg_isready -q -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 60
       start_period: 60s
+    volumes:
+      - elysium-pgdata:/var/lib/postgresql/data
 
   app:
     build:
@@ -40,3 +38,6 @@ services:
       gunicorn -k uvicorn.workers.UvicornWorker main:app
       -b 0.0.0.0:8080
       --workers ${WEB_CONCURRENCY:-2}
+
+volumes:
+  elysium-pgdata:
