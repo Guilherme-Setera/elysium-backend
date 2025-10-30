@@ -3,8 +3,12 @@ services:
     image: postgres:16-alpine
     container_name: elysium-postgres
     restart: unless-stopped
-    env_file:
-      - .env.db
+    environment:
+      POSTGRES_USER: "elysium"
+      POSTGRES_PASSWORD: "Gscob@1996"
+      POSTGRES_DB: "elysiumdb"
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - elysium-pgdata:/var/lib/postgresql/data
 
