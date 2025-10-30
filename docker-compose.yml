@@ -12,14 +12,12 @@ services:
         - CMD-SHELL
         - >
           pg_isready
-          -U "$${POSTGRES_USER:-postgres}"
-          -d "$${POSTGRES_DB:-postgres}"
           -h 127.0.0.1
           -p "$${POSTGRES_PORT:-5432}"
       interval: 5s
       timeout: 3s
-      retries: 15
-      start_period: 10s
+      retries: 20
+      start_period: 15s
 
   app:
     build:
