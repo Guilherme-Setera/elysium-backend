@@ -24,46 +24,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Escreve a chave privada a partir do secret *base64*
-      - name: Write SSH key from base64 secret
+      - name: Prepare SSH folder
+        shell: bash
+        run: install -m 700 -d ~/.ssh
+
+      - name: Write SSH key
         shell: bash
         run: |
           umask 077
-          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > hostinger_ci
-          chmod 600 hostinger_ci
+          (echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/hostinger_ci) 2>/dev/null || \
+          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/hostinger_ci
+          chmod 600 ~/.ssh/hostinger_ci
 
-      # Opcional, só para debug/garantir formato correto
-      - name: Show derived fingerprint (from secret)
+      - name: Show derived fingerprint
         shell: bash
         run: |
-          head -n1 hostinger_ci
-          tail -n1 hostinger_ci
-          ssh-keygen -y -f hostinger_ci > hostinger_ci.pub
-          ssh-keygen -lf hostinger_ci.pub
+          head -n1 ~/.ssh/hostinger_ci
+          tail -n1 ~/.ssh/hostinger_ci
+          ssh-keygen -y -f ~/.ssh/hostinger_ci > ~/.ssh/hostinger_ci.pub
+          ssh-keygen -lf ~/.ssh/hostinger_ci.pub
 
-      # Evita prompt de host key na primeira conexão
       - name: Add server to known_hosts
         shell: bash
         run: |
           PORT="${{ secrets.VPS_PORT || 22 }}"
           ssh-keyscan -p "$PORT" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
 
-      # Teste rápido de SSH
       - name: Test SSH
         shell: bash
         run: |
           PORT="${{ secrets.VPS_PORT || 22 }}"
-          ssh -i hostinger_ci -p "$PORT" -o StrictHostKeyChecking=yes \
+          ssh -i ~/.ssh/hostinger_ci -p "$PORT" -o StrictHostKeyChecking=yes \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "echo connected"
 
-      # SSH e deploy remoto
       - name: SSH into VPS and deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
-          key_path: hostinger_ci
+          key_path: ~/.ssh/hostinger_ci
           debug: true
           script_stop: true
           script: |
@@ -79,7 +79,6 @@ jobs:
               git checkout -f main
             fi
 
-            # Escreve o .env da produção
             cat > .env.production << 'EOF'
             ENVIRONMENT=${{ secrets.ENVIRONMENT }}
             POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
@@ -96,15 +95,10 @@ jobs:
             WEB_CONCURRENCY=${{ secrets.WEB_CONCURRENCY }}
             EOF
 
-            # Compose (ajuste se o arquivo não se chama docker-compose.yml)
             docker compose pull || true
             docker compose build --no-cache
             docker compose up -d --remove-orphans
-
-            # Limpeza básica
             docker image prune -f
-
-            # Healthcheck
             curl -fsS http://127.0.0.1:8080/health || (echo "Healthcheck FAIL" && exit 1)
 
       - name: Done
