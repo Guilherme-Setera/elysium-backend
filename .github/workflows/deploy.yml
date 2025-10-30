@@ -84,9 +84,9 @@ jobs:
             EOF
 
             cat > .env.db << 'EOF'
-            POSTGRES_USERNAME=${{ secrets.POSTGRES_USERNAME }}
+            POSTGRES_USER=${{ secrets.POSTGRES_USERNAME }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DATABASE=${{ secrets.POSTGRES_DATABASE }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DATABASE }}
             EOF
 
             ls -l .env .env.db || true
