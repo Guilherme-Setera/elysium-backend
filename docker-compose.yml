@@ -43,7 +43,7 @@ services:
       JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY}
       JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS}
     ports:
-      - "${PORT:-8080}:8080"
+      - "127.0.0.1:${PORT:-8080}:8080"
     command: ["gunicorn",
               "-k","uvicorn.workers.UvicornWorker",
               "-w","${WEB_CONCURRENCY:-2}",
