@@ -7,6 +7,8 @@ from src.modules.vendas.dto.dto import (
     VendaResponse,
     ItemVendaResponse,
     RegistrarPagamentoDTO,
+    VendaHistoricoConsolidadoFiltro,
+    VendaHistoricoConsolidadoItem,
 )
 from src.modules.vendas.usecase.vendas_usecase import (
     RegistrarVendaUseCase,
@@ -18,6 +20,7 @@ from src.modules.vendas.usecase.vendas_usecase import (
     BuscarVendaComItensUseCase,
     ListarVendasNaoPagasUseCase,
     RegistrarPagamentoVendaUseCase,
+    ListarHistoricoConsolidadoUseCase,
 )
 from src.modules.vendas.vendas_dependencies import (
     get_registrar_venda_usecase,
@@ -29,6 +32,7 @@ from src.modules.vendas.vendas_dependencies import (
     get_buscar_venda_com_itens_usecase,
     get_listar_vendas_nao_pagas_usecase,
     get_registrar_pagamento_venda_usecase,
+    get_listar_historico_consolidado_usecase,
 )
 
 router = APIRouter(prefix="/vendas", tags=["Vendas"])
@@ -111,6 +115,30 @@ def cancelar_venda(
 ):
     usecase.executar(venda_id)
     return {"message": "Venda cancelada com sucesso."}
+
+
+@router.get("/historico-consolidado", response_model=List[VendaHistoricoConsolidadoItem])
+def listar_historico_consolidado(
+    data_de: str = None,
+    data_ate: str = None,
+    usar_data: str = "data_venda",
+    usecase: ListarHistoricoConsolidadoUseCase = Depends(get_listar_historico_consolidado_usecase),
+) -> List[VendaHistoricoConsolidadoItem]:
+    """
+    Retorna o histórico consolidado de vendas com informações de custos e lucros.
+
+    - **data_de**: Data inicial do filtro (formato: YYYY-MM-DD)
+    - **data_ate**: Data final do filtro (formato: YYYY-MM-DD)
+    - **usar_data**: Tipo de data para filtrar ('data_venda' ou 'data_quitacao')
+    """
+    from datetime import date
+
+    filtro = VendaHistoricoConsolidadoFiltro(
+        data_de=date.fromisoformat(data_de) if data_de else None,
+        data_ate=date.fromisoformat(data_ate) if data_ate else None,
+        usar_data=usar_data,
+    )
+    return usecase.executar(filtro)
 
 
 @router.get("/{venda_id}", response_model=dict)

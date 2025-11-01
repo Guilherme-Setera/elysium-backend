@@ -13,6 +13,10 @@ from src.modules.vendas.dto.dto import (
     ItemVendaResponse,
     VendaUpdate,
     RegistrarPagamentoDTO,
+    VendaHistoricoConsolidadoFiltro,
+    VendaHistoricoConsolidadoItem,
+    VendaHistoricoMateriaPrima,
+    VendaHistoricoItemProducao,
 )
 from src.modules.vendas.abc_classes.vendas_abc import IVendaRepository
 
@@ -309,3 +313,80 @@ class VendaRepository(IVendaRepository):
             query = f.read()
         self.session.execute(text(query), {"venda_id": venda_id})
         self.session.commit()
+
+    def desabilitar_triggers_recalculo(self) -> None:
+        """Desabilita temporariamente os triggers de recálculo durante inserção em lote de itens."""
+        self.session.execute(text("SET session_replication_role = replica;"))
+
+    def habilitar_triggers_recalculo(self) -> None:
+        """Reabilita os triggers de recálculo após inserção em lote de itens."""
+        self.session.execute(text("SET session_replication_role = DEFAULT;"))
+
+    def listar_historico_consolidado(
+        self, filtro: VendaHistoricoConsolidadoFiltro
+    ) -> list[VendaHistoricoConsolidadoItem]:
+        """Retorna o histórico consolidado de vendas com custos e lucros."""
+        query_path = os.path.join(QUERIES_FOLDER, "select_historico_consolidado.sql")
+        with open(query_path, "r", encoding="utf-8") as f:
+            query = f.read()
+
+        rows = self.session.execute(
+            text(query),
+            {
+                "data_de": filtro.data_de,
+                "data_ate": filtro.data_ate,
+                "usar_data": filtro.usar_data or "data_venda",
+            },
+        ).mappings().all()
+
+        resultado: list[VendaHistoricoConsolidadoItem] = []
+
+        for row in rows:
+            data = dict(row)
+
+            # Converter valores numéricos
+            for k in ("valor_total", "valor_pago", "valor_custo", "lucro"):
+                if k in data and data[k] is not None:
+                    data[k] = float(data[k])
+
+            # Processar matérias-primas JSON
+            if data.get("materias_primas"):
+                materias = data["materias_primas"]
+                if isinstance(materias, str):
+                    materias = json.loads(materias)
+                if materias and isinstance(materias, list):
+                    data["materias_primas"] = [
+                        VendaHistoricoMateriaPrima(
+                            nome=mp.get("nome") or "",
+                            quantidade=float(mp["quantidade"]) if mp.get("quantidade") is not None else None,
+                            valor=float(mp["valor"]) if mp.get("valor") is not None else 0.0,
+                        )
+                        for mp in materias if mp  # Filtrar matérias None
+                    ]
+                else:
+                    data["materias_primas"] = []
+            else:
+                data["materias_primas"] = []
+
+            # Processar itens de produção JSON
+            if data.get("itens_producao"):
+                itens = data["itens_producao"]
+                if isinstance(itens, str):
+                    itens = json.loads(itens)
+                if itens and isinstance(itens, list):
+                    data["itens_producao"] = [
+                        VendaHistoricoItemProducao(
+                            nome=item.get("nome") or "",
+                            quantidade=int(item["quantidade"]) if item.get("quantidade") is not None else None,
+                            valor=float(item["valor"]) if item.get("valor") is not None else 0.0,
+                        )
+                        for item in itens if item  # Filtrar itens None
+                    ]
+                else:
+                    data["itens_producao"] = []
+            else:
+                data["itens_producao"] = []
+
+            resultado.append(VendaHistoricoConsolidadoItem(**data))
+
+        return resultado

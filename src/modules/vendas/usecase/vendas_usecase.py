@@ -7,6 +7,8 @@ from src.modules.vendas.dto.dto import (
     VendaResponse,
     ItemVendaResponse,
     RegistrarPagamentoDTO,
+    VendaHistoricoConsolidadoFiltro,
+    VendaHistoricoConsolidadoItem,
 )
 from src.modules.vendas.repository.vendas_repository import VendaRepository
 from src.modules.estoque.repository.estoque_repository import EstoqueRepository
@@ -31,14 +33,21 @@ class RegistrarVendaUseCase:
 
         venda_id = self.venda_repo.inserir_venda(venda, total)
 
-        for item in venda.itens:
-            self.venda_repo.inserir_item_venda(venda_id, item)
-            self.venda_repo.registrar_saida_por_venda(
-                produto_id=item.produto_id,
-                quantidade=item.quantidade,
-                data_mov=venda.data_venda or datetime.now(),
-                venda_id=venda_id,
-            )
+        # Desabilitar triggers temporariamente durante inserção de itens
+        self.venda_repo.desabilitar_triggers_recalculo()
+
+        try:
+            for item in venda.itens:
+                self.venda_repo.inserir_item_venda(venda_id, item)
+                self.venda_repo.registrar_saida_por_venda(
+                    produto_id=item.produto_id,
+                    quantidade=item.quantidade,
+                    data_mov=venda.data_venda or datetime.now(),
+                    venda_id=venda_id,
+                )
+        finally:
+            # Reabilitar triggers após inserção de todos os itens
+            self.venda_repo.habilitar_triggers_recalculo()
 
         return venda_id
 
@@ -59,14 +68,21 @@ class AtualizarVendaUseCase:
         total = sum(item.quantidade * item.preco_unitario for item in nova_venda.itens)
         self.venda_repo.atualizar_venda(venda_id, nova_venda, total)
 
-        for item in nova_venda.itens:
-            self.venda_repo.inserir_item_venda(venda_id, item)
-            self.venda_repo.registrar_saida_por_venda(
-                produto_id=item.produto_id,
-                quantidade=item.quantidade,
-                data_mov=nova_venda.data_venda or datetime.now(),
-                venda_id=venda_id,
-            )
+        # Desabilitar triggers temporariamente durante inserção de itens
+        self.venda_repo.desabilitar_triggers_recalculo()
+
+        try:
+            for item in nova_venda.itens:
+                self.venda_repo.inserir_item_venda(venda_id, item)
+                self.venda_repo.registrar_saida_por_venda(
+                    produto_id=item.produto_id,
+                    quantidade=item.quantidade,
+                    data_mov=nova_venda.data_venda or datetime.now(),
+                    venda_id=venda_id,
+                )
+        finally:
+            # Reabilitar triggers após inserção de todos os itens
+            self.venda_repo.habilitar_triggers_recalculo()
 
 
 class ConfirmarPagamentoVendaUseCase:
@@ -129,3 +145,11 @@ class RegistrarPagamentoVendaUseCase:
 
     def executar(self, data: RegistrarPagamentoDTO) -> bool:
         return self.venda_repo.registrar_pagamento_venda(data)
+
+
+class ListarHistoricoConsolidadoUseCase:
+    def __init__(self, venda_repo: VendaRepository):
+        self.venda_repo = venda_repo
+
+    def executar(self, filtro: VendaHistoricoConsolidadoFiltro) -> list[VendaHistoricoConsolidadoItem]:
+        return self.venda_repo.listar_historico_consolidado(filtro)

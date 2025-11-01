@@ -98,3 +98,37 @@ class RegistrarPagamentoDTO(BaseModel):
     venda_id: int
     valor_recebido: float = Field(gt=0)
     data_pagamento: Optional[datetime] = None
+
+
+class VendaHistoricoMateriaPrima(BaseModel):
+    nome: str
+    quantidade: Optional[float] = None
+    valor: float
+
+
+class VendaHistoricoItemProducao(BaseModel):
+    nome: str
+    quantidade: Optional[int] = None
+    valor: float
+
+
+class VendaHistoricoConsolidadoItem(BaseModel):
+    id: int
+    venda_id: int
+    cliente_nome: Optional[str] = None
+    data_venda: Optional[datetime] = None
+    data_quitacao: Optional[date] = None
+    valor_total: Optional[float] = None
+    valor_pago: Optional[float] = None
+    valor_custo: Optional[float] = None
+    lucro: Optional[float] = None
+    materias_primas: Optional[List[VendaHistoricoMateriaPrima]] = None
+    itens_producao: Optional[List[VendaHistoricoItemProducao]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class VendaHistoricoConsolidadoFiltro(BaseModel):
+    data_de: Optional[date] = None
+    data_ate: Optional[date] = None
+    usar_data: Optional[str] = "data_venda"  # 'data_venda' ou 'data_quitacao'

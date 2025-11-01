@@ -9,6 +9,8 @@ from src.modules.vendas.dto.dto import (
     ItemVendaResponse,
     VendaResponse,
     RegistrarPagamentoDTO,
+    VendaHistoricoConsolidadoFiltro,
+    VendaHistoricoConsolidadoItem,
 )
 
 class IVendaRepository(ABC):
@@ -72,4 +74,18 @@ class IVendaRepository(ABC):
 
     @abstractmethod
     def registrar_pagamento_venda(self, data: RegistrarPagamentoDTO) -> bool:
+        ...
+
+    @abstractmethod
+    def desabilitar_triggers_recalculo(self) -> None:
+        ...
+
+    @abstractmethod
+    def habilitar_triggers_recalculo(self) -> None:
+        ...
+
+    @abstractmethod
+    def listar_historico_consolidado(
+        self, filtro: VendaHistoricoConsolidadoFiltro
+    ) -> List[VendaHistoricoConsolidadoItem]:
         ...

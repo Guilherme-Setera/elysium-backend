@@ -128,8 +128,8 @@ class ProdutoPrecoResponse(BaseModel):
 
 class PrecoAtualResponse(BaseModel):
     nome: str
-    preco_custo: float
-    preco_venda: float
+    preco_custo: Optional[float]
+    preco_venda: Optional[float]
     estoque: int
 
 

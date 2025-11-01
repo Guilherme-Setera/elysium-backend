@@ -10,14 +10,15 @@ from src.modules.estoque.repository.estoque_repository import EstoqueRepository
 
 from src.modules.vendas.usecase.vendas_usecase import (
     RegistrarVendaUseCase,
-    ListarVendasUseCase, 
-    ListarItensVendaUseCase, 
+    ListarVendasUseCase,
+    ListarItensVendaUseCase,
     AtualizarVendaUseCase,
     ConfirmarPagamentoVendaUseCase,
     CancelarVendaUseCase,
     BuscarVendaComItensUseCase,
     ListarVendasNaoPagasUseCase,
-    RegistrarPagamentoVendaUseCase
+    RegistrarPagamentoVendaUseCase,
+    ListarHistoricoConsolidadoUseCase,
     )
 
 
@@ -62,3 +63,7 @@ def get_listar_vendas_nao_pagas_usecase(session: Session = Depends(get_db)) -> L
 def get_registrar_pagamento_venda_usecase(session: Session = Depends(get_db)) -> RegistrarPagamentoVendaUseCase:
     venda_repo: IVendaRepository = VendaRepository(session)
     return RegistrarPagamentoVendaUseCase(venda_repo)
+
+def get_listar_historico_consolidado_usecase(session: Session = Depends(get_db)) -> ListarHistoricoConsolidadoUseCase:
+    venda_repo: IVendaRepository = VendaRepository(session)
+    return ListarHistoricoConsolidadoUseCase(venda_repo)
