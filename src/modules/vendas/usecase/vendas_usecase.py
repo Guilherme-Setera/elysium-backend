@@ -33,7 +33,6 @@ class RegistrarVendaUseCase:
 
         venda_id = self.venda_repo.inserir_venda(venda, total)
 
-        # Desabilitar triggers temporariamente durante inserção de itens
         self.venda_repo.desabilitar_triggers_recalculo()
 
         try:
@@ -45,8 +44,9 @@ class RegistrarVendaUseCase:
                     data_mov=venda.data_venda or datetime.now(),
                     venda_id=venda_id,
                 )
+
+            self.venda_repo.session.commit()
         finally:
-            # Reabilitar triggers após inserção de todos os itens
             self.venda_repo.habilitar_triggers_recalculo()
 
         return venda_id
@@ -65,24 +65,29 @@ class AtualizarVendaUseCase:
         self.venda_repo.deletar_movimentacoes_por_venda(venda_id)
         self.venda_repo.deletar_itens_da_venda(venda_id)
 
-        total = sum(item.quantidade * item.preco_unitario for item in nova_venda.itens)
+        if nova_venda.itens:
+            total = sum(item.quantidade * item.preco_unitario for item in nova_venda.itens)
+        else:
+            total = 0.0
+
         self.venda_repo.atualizar_venda(venda_id, nova_venda, total)
 
-        # Desabilitar triggers temporariamente durante inserção de itens
-        self.venda_repo.desabilitar_triggers_recalculo()
+        if nova_venda.itens:
+            self.venda_repo.desabilitar_triggers_recalculo()
 
-        try:
-            for item in nova_venda.itens:
-                self.venda_repo.inserir_item_venda(venda_id, item)
-                self.venda_repo.registrar_saida_por_venda(
-                    produto_id=item.produto_id,
-                    quantidade=item.quantidade,
-                    data_mov=nova_venda.data_venda or datetime.now(),
-                    venda_id=venda_id,
-                )
-        finally:
-            # Reabilitar triggers após inserção de todos os itens
-            self.venda_repo.habilitar_triggers_recalculo()
+            try:
+                for item in nova_venda.itens:
+                    self.venda_repo.inserir_item_venda(venda_id, item)
+                    self.venda_repo.registrar_saida_por_venda(
+                        produto_id=item.produto_id,
+                        quantidade=item.quantidade,
+                        data_mov=nova_venda.data_venda or datetime.now(),
+                        venda_id=venda_id,
+                    )
+
+                self.venda_repo.session.commit()
+            finally:
+                self.venda_repo.habilitar_triggers_recalculo()
 
 
 class ConfirmarPagamentoVendaUseCase:

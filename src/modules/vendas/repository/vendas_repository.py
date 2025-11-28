@@ -252,7 +252,7 @@ class VendaRepository(IVendaRepository):
                 "preco_unitario": item.preco_unitario,
             },
         ).fetchone()
-        self.session.commit()
+        # Não fazer commit aqui - será feito pelo usecase
         return int(row[0]) if row else -1
 
     def buscar_itens_por_venda_id(self, venda_id: int) -> list[ItemVendaResponse]:
@@ -271,7 +271,7 @@ class VendaRepository(IVendaRepository):
         query_path = os.path.join(QUERIES_FOLDER, "insert_movimentacao_estoque_venda.sql")
         with open(query_path, "r", encoding="utf-8") as f:
             query = f.read()
-        row = self.session.execute(
+        self.session.execute(
             text(query),
             {
                 "produto_id": produto_id,
@@ -280,9 +280,8 @@ class VendaRepository(IVendaRepository):
                 "data_mov": data_mov,
                 "venda_id": venda_id,
             },
-        ).fetchone()
-        self.session.commit()
-        return int(row[0]) if row else -1
+        )
+        return 1
 
     def registrar_entrada_por_devolucao(
         self,
