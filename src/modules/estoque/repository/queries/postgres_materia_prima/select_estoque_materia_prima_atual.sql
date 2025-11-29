@@ -3,9 +3,7 @@ SELECT
   mp.nome                       AS nome_materia_prima,
   mp.unidade_base,
   mp.medida_base,
-  COALESCE(SUM(
-    CASE WHEN m.is_entrada THEN m.quantidade_estoque ELSE -m.quantidade_estoque END
-  ), 0)::numeric(12,3)          AS saldo_estoque,
+  COALESCE(SUM(m.quantidade_estoque), 0)::numeric(12,3) AS saldo_estoque,
   precos.preco_custo,
   MAX(m.data_mov)               AS data_movimentacao,
   proximo_lote.lote             AS lote
@@ -13,6 +11,7 @@ FROM elysium.materias_prima mp
 LEFT JOIN elysium.movimentacoes_estoque_materia_prima m
   ON m.materia_prima_id = mp.id
  AND DATE(m.data_mov) <= :data_referencia
+ AND m.is_entrada = TRUE
 LEFT JOIN LATERAL (
   SELECT mm.preco_custo
   FROM elysium.movimentacoes_estoque_materia_prima mm
