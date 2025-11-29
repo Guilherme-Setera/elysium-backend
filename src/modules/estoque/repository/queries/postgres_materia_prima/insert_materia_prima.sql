@@ -22,7 +22,7 @@ INSERT INTO elysium.materias_prima (
     ELSE NOT COALESCE(:is_grama, TRUE)
   END,
   CASE
-    WHEN :unidade = 'ml' THEN :densidade
+    WHEN :unidade = 'ml' THEN CAST(:densidade AS NUMERIC)
     ELSE NULL
   END
 )
