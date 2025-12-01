@@ -183,4 +183,4 @@ class ReceitaMovimentacaoResponse(BaseModel):
     quantidade_produto: int
     is_meia_receita: bool
     custo_total_producao: Decimal
-    custo_unitario_produto: Decimal
+    custo_unitario_produto: Optional[Decimal] = None

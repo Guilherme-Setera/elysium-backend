@@ -115,6 +115,7 @@ class ReceitasRepository(IReceitasRepository):
         upd_preco_sql = self._read_query("update_mov_prod_preco_custo_unit.sql")
         upd_quant_sql = self._read_query("update_mov_receita_quantidades.sql")
         upd_custos_sql = self._read_query("update_mov_receita_custos.sql")
+        upd_custo_unit_sql = self._read_query("update_custo_unitario_produto.sql")
 
         consumos_json = json.dumps(jsonable_encoder(data.consumos or {}))
         produto_final_json = json.dumps(jsonable_encoder(data.produto_final)) if data.produto_final else None
@@ -174,6 +175,8 @@ class ReceitasRepository(IReceitasRepository):
                 )
             else:
                 self.session.execute(text(recalc_sql), {"rec_id": rec_id, "op_tag": op_tag})
+
+            self.session.execute(text(upd_custo_unit_sql), {"rec_id": rec_id})
 
             if produto_mov_id and produto_mov_id > 0:
                 self.session.execute(text(upd_preco_sql), {"produto_mov_id": produto_mov_id})
